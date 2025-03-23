@@ -86,7 +86,7 @@ export function FeaturedWorkers() {
                             : "star_border"}
                       </span>
                     ))}
-                    <span className="ml-1 text-neutral-700">{worker.averageRating.toFixed(1)}</span>
+                    <span className="ml-1 text-neutral-700">{worker.averageRating}</span>
                   </div>
                   <div className="flex items-center text-neutral-500 text-sm mb-3">
                     <span className="material-icons text-sm mr-1">location_on</span>
