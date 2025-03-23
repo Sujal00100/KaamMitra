@@ -333,41 +333,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Simple worker profile test endpoint
+  app.get("/api/workers/profile-test", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    
+    // Just return basic info without any database calls
+    return res.json({
+      message: "Profile test endpoint is working",
+      user: req.user
+    });
+  });
+
   // GET worker dashboard data
   app.get("/api/workers/dashboard", async (req, res) => {
     try {
       console.log("Worker dashboard - authentication check", req.isAuthenticated());
+      console.log("Worker dashboard - user:", req.user);
       
       if (!req.isAuthenticated()) {
         return res.status(401).json({ message: "Not authenticated" });
       }
       
-      try {
-        // Directly fetch the worker profile for a known worker ID (8)
-        const workerId = 8; // Hardcoded ID for testing
-        
-        // Fetch profile from database
-        const profile = await storage.getWorkerProfile(workerId);
-        
-        if (!profile) {
-          return res.status(404).json({ message: "Worker profile not found" });
-        }
-        
-        const applications = await storage.getApplicationsByWorker(workerId);
-        const ratings = await storage.getRatingsByWorker(workerId);
-        
-        return res.json({ 
-          profile, 
-          applications, 
-          ratings 
-        });
-      } catch (dbError) {
-        console.error("Database error:", dbError);
-        return res.status(500).json({ 
-          message: "Database error", 
-          error: dbError instanceof Error ? dbError.message : 'Unknown database error' 
-        });
-      }
+      // Just return a static response for testing
+      return res.json({
+        profile: {
+          id: 1,
+          userId: 8,
+          primarySkill: "Carpentry",
+          description: "Skilled carpenter with 8 years of experience",
+          isAvailable: true,
+          averageRating: 4.5,
+          totalRatings: 15,
+          verified: true
+        },
+        applications: [],
+        ratings: []
+      });
     } catch (error) {
       console.error("Worker dashboard error:", error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

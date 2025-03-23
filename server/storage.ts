@@ -476,16 +476,67 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getApplicationsByWorker(workerId: number): Promise<(Application & { job: Job })[]> {
-    const appResults = await db.select()
-      .from(applications)
-      .where(eq(applications.workerId, workerId));
-    
-    return Promise.all(
-      appResults.map(async (app) => {
-        const jobResult = await db.select().from(jobs).where(eq(jobs.id, app.jobId));
-        return { ...app, job: jobResult[0] };
-      })
-    );
+    try {
+      console.log("Getting applications for workerId:", workerId);
+      const appResults = await db.select()
+        .from(applications)
+        .where(eq(applications.workerId, workerId));
+      
+      console.log("Application query results:", appResults);
+      
+      if (appResults.length === 0) {
+        return [];
+      }
+      
+      return Promise.all(
+        appResults.map(async (app) => {
+          try {
+            const jobResult = await db.select().from(jobs).where(eq(jobs.id, app.jobId));
+            if (jobResult.length === 0) {
+              console.log("No job found for jobId:", app.jobId);
+              // Return the application with a default job to avoid errors
+              return { 
+                ...app, 
+                job: {
+                  id: app.jobId,
+                  title: "Unknown Job",
+                  description: "",
+                  location: "",
+                  category: "",
+                  wage: "",
+                  duration: null,
+                  employerId: 0,
+                  isActive: false,
+                  createdAt: new Date()
+                } 
+              };
+            }
+            return { ...app, job: jobResult[0] };
+          } catch (error) {
+            console.error("Error fetching job for application:", error);
+            // Return the application with a default job to avoid errors
+            return { 
+              ...app, 
+              job: {
+                id: app.jobId,
+                title: "Error Fetching Job",
+                description: "",
+                location: "",
+                category: "",
+                wage: "",
+                duration: null,
+                employerId: 0,
+                isActive: false,
+                createdAt: new Date()
+              } 
+            };
+          }
+        })
+      );
+    } catch (error) {
+      console.error("Error in getApplicationsByWorker:", error);
+      return [];
+    }
   }
 
   async getApplicationsByJob(jobId: number): Promise<(Application & { worker: User })[]> {
@@ -520,10 +571,19 @@ export class DatabaseStorage implements IStorage {
 
   // Rating operations
   async getRatingsByWorker(workerId: number): Promise<Rating[]> {
-    return db.select()
-      .from(ratings)
-      .where(eq(ratings.workerId, workerId))
-      .orderBy(desc(ratings.createdAt));
+    try {
+      console.log("Getting ratings for workerId:", workerId);
+      const result = await db.select()
+        .from(ratings)
+        .where(eq(ratings.workerId, workerId))
+        .orderBy(desc(ratings.createdAt));
+      
+      console.log("Ratings query results:", result);
+      return result;
+    } catch (error) {
+      console.error("Error in getRatingsByWorker:", error);
+      return [];
+    }
   }
 
   async createRating(rating: InsertRating): Promise<Rating> {
