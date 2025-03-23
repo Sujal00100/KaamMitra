@@ -41,6 +41,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/workers/:id", async (req, res) => {
     try {
       const userId = parseInt(req.params.id);
+      
+      if (isNaN(userId)) {
+        return res.status(400).json({ message: "Invalid worker ID" });
+      }
+      
       const user = await storage.getUser(userId);
       
       if (!user || user.userType !== "worker") {
@@ -52,7 +57,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json({ user, profile, ratings });
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch worker" });
+      console.error("Error fetching worker:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({ message: "Failed to fetch worker", error: errorMessage });
     }
   });
 
@@ -300,7 +307,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied" });
       }
       
-      const jobs = await storage.getJobsByEmployer(req.user.id);
+      // Ensure we have a valid user ID (must be a number)
+      const userId = typeof req.user.id === 'number' ? req.user.id : parseInt(req.user.id);
+      
+      if (isNaN(userId)) {
+        return res.status(400).json({ message: "Invalid user ID" });
+      }
+      
+      console.log("Employer dashboard - authenticated user:", userId, req.user.username);
+      
+      const jobs = await storage.getJobsByEmployer(userId);
+      console.log("Employer jobs found:", jobs.length);
       
       // Get applications for each job
       const jobsWithApplications = await Promise.all(jobs.map(async job => {
@@ -310,7 +327,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json({ jobs: jobsWithApplications });
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch dashboard data" });
+      console.error("Employer dashboard error:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({ message: "Failed to fetch dashboard data", error: errorMessage });
     }
   });
 
@@ -325,18 +344,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied" });
       }
       
-      console.log("Worker dashboard - authenticated user:", req.user.id, req.user.username);
+      // Ensure we have a valid user ID (must be a number)
+      const userId = typeof req.user.id === 'number' ? req.user.id : parseInt(req.user.id);
+      
+      if (isNaN(userId)) {
+        return res.status(400).json({ message: "Invalid user ID" });
+      }
+      
+      console.log("Worker dashboard - authenticated user:", userId, req.user.username);
       
       // Check if profile exists, if not create default profile
-      let profile = await storage.getWorkerProfile(req.user.id);
+      let profile = await storage.getWorkerProfile(userId);
       console.log("Worker profile found:", profile ? "Yes" : "No");
       
       if (!profile) {
-        console.log("Creating default worker profile for user ID:", req.user.id);
+        console.log("Creating default worker profile for user ID:", userId);
         try {
           // Create a default profile for the worker
           profile = await storage.createWorkerProfile({
-            userId: req.user.id,
+            userId,
             primarySkill: "general", // Default skill
             description: "",
             isAvailable: true
@@ -349,10 +375,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      const applications = await storage.getApplicationsByWorker(req.user.id);
+      const applications = await storage.getApplicationsByWorker(userId);
       console.log("Worker applications found:", applications.length);
       
-      const ratings = await storage.getRatingsByWorker(req.user.id);
+      const ratings = await storage.getRatingsByWorker(userId);
       console.log("Worker ratings found:", ratings.length);
       
       res.json({ profile, applications, ratings });

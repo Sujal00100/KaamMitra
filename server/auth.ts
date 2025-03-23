@@ -67,11 +67,23 @@ export function setupAuth(app: Express) {
 
   passport.serializeUser((user, done) => done(null, user.id));
   
-  passport.deserializeUser(async (id: number, done) => {
+  passport.deserializeUser(async (id: unknown, done) => {
     try {
-      const user = await storage.getUser(id);
+      console.log("Deserializing user ID:", id, "type:", typeof id);
+      
+      // Ensure ID is a number
+      const userId = typeof id === 'number' ? id : parseInt(id as string);
+      
+      if (isNaN(userId)) {
+        console.error("Invalid user ID during deserialization:", id);
+        return done(new Error("Invalid user ID"));
+      }
+      
+      const user = await storage.getUser(userId);
+      console.log("Deserialized user:", user ? "Found" : "Not found");
       done(null, user);
     } catch (error) {
+      console.error("Error deserializing user:", error);
       done(error);
     }
   });
@@ -118,6 +130,13 @@ export function setupAuth(app: Express) {
 
       req.login(user, (loginErr) => {
         if (loginErr) return next(loginErr);
+        
+        // Log user ID to debug session issues
+        console.log("User logged in successfully:", {
+          id: user.id,
+          username: user.username,
+          idType: typeof user.id
+        });
         
         // Return user without password
         const { password, ...userWithoutPassword } = user;
