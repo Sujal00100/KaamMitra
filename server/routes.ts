@@ -325,25 +325,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied" });
       }
       
+      console.log("Worker dashboard - authenticated user:", req.user.id, req.user.username);
+      
       // Check if profile exists, if not create default profile
       let profile = await storage.getWorkerProfile(req.user.id);
+      console.log("Worker profile found:", profile ? "Yes" : "No");
+      
       if (!profile) {
-        // Create a default profile for the worker
-        profile = await storage.createWorkerProfile({
-          userId: req.user.id,
-          primarySkill: "general", // Default skill
-          description: "",
-          isAvailable: true
-        });
+        console.log("Creating default worker profile for user ID:", req.user.id);
+        try {
+          // Create a default profile for the worker
+          profile = await storage.createWorkerProfile({
+            userId: req.user.id,
+            primarySkill: "general", // Default skill
+            description: "",
+            isAvailable: true
+          });
+          console.log("Created worker profile:", profile);
+        } catch (profileError) {
+          console.error("Error creating worker profile:", profileError);
+          return res.status(500).json({ message: "Failed to create worker profile", error: profileError.message });
+        }
       }
       
       const applications = await storage.getApplicationsByWorker(req.user.id);
+      console.log("Worker applications found:", applications.length);
+      
       const ratings = await storage.getRatingsByWorker(req.user.id);
+      console.log("Worker ratings found:", ratings.length);
       
       res.json({ profile, applications, ratings });
     } catch (error) {
       console.error("Worker dashboard error:", error);
-      res.status(500).json({ message: "Failed to fetch dashboard data" });
+      res.status(500).json({ message: "Failed to fetch worker dashboard data", error: error.message });
     }
   });
 
