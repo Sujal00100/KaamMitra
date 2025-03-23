@@ -302,31 +302,58 @@ export class DatabaseStorage implements IStorage {
 
   // User operations
   async getUser(id: number): Promise<User | undefined> {
-    const result = await db.select().from(users).where(eq(users.id, id));
-    return result[0];
+    try {
+      const result = await db.select().from(users).where(eq(users.id, id));
+      return result[0];
+    } catch (error) {
+      console.error("Error in getUser:", error);
+      throw error;
+    }
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    const result = await db.select().from(users).where(eq(users.username, username));
-    return result[0];
+    try {
+      const result = await db.select().from(users).where(eq(users.username, username));
+      return result[0];
+    } catch (error) {
+      console.error("Error in getUserByUsername:", error);
+      throw error;
+    }
   }
 
   async getUsers(userType?: string): Promise<User[]> {
-    if (userType) {
-      return db.select().from(users).where(eq(users.userType, userType));
+    try {
+      if (userType) {
+        return await db.select().from(users).where(eq(users.userType, userType));
+      }
+      return await db.select().from(users);
+    } catch (error) {
+      console.error("Error in getUsers:", error);
+      throw error;
     }
-    return db.select().from(users);
   }
 
   async createUser(user: InsertUser): Promise<User> {
-    const result = await db.insert(users).values(user).returning();
-    return result[0];
+    try {
+      const result = await db.insert(users).values(user).returning();
+      return result[0];
+    } catch (error) {
+      console.error("Error in createUser:", error);
+      throw error;
+    }
   }
 
   // Worker profile operations
   async getWorkerProfile(userId: number): Promise<WorkerProfile | undefined> {
-    const result = await db.select().from(workerProfiles).where(eq(workerProfiles.userId, userId));
-    return result[0];
+    try {
+      console.log("Getting worker profile for userId:", userId);
+      const result = await db.select().from(workerProfiles).where(eq(workerProfiles.userId, userId));
+      console.log("Worker profile query result:", result);
+      return result[0];
+    } catch (error) {
+      console.error("Error in getWorkerProfile:", error);
+      throw error;
+    }
   }
 
   async createWorkerProfile(profile: InsertWorkerProfile): Promise<WorkerProfile> {

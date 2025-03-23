@@ -344,7 +344,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log("Created worker profile:", profile);
         } catch (profileError) {
           console.error("Error creating worker profile:", profileError);
-          return res.status(500).json({ message: "Failed to create worker profile", error: profileError.message });
+          const errorMessage = profileError instanceof Error ? profileError.message : 'Unknown error';
+          return res.status(500).json({ message: "Failed to create worker profile", error: errorMessage });
         }
       }
       
@@ -357,7 +358,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ profile, applications, ratings });
     } catch (error) {
       console.error("Worker dashboard error:", error);
-      res.status(500).json({ message: "Failed to fetch worker dashboard data", error: error.message });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({ message: "Failed to fetch worker dashboard data", error: errorMessage });
     }
   });
 
