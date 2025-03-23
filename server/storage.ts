@@ -5,8 +5,12 @@ import { applications, type Application, type InsertApplication } from "@shared/
 import { ratings, type Rating, type InsertRating } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
+import { eq, desc, and, like } from "drizzle-orm";
+import connectPgSimple from "connect-pg-simple";
+import { db, pool } from "./db";
 
 const MemoryStore = createMemoryStore(session);
+const PostgresSessionStore = connectPgSimple(session);
 
 export interface IStorage {
   // User operations
@@ -41,7 +45,7 @@ export interface IStorage {
   createRating(rating: InsertRating): Promise<Rating>;
   
   // Session store for authentication
-  sessionStore: session.SessionStore;
+  sessionStore: any;
 }
 
 export class MemStorage implements IStorage {
@@ -50,7 +54,7 @@ export class MemStorage implements IStorage {
   private jobs: Map<number, Job>;
   private applications: Map<number, Application>;
   private ratings: Map<number, Rating>;
-  public sessionStore: session.SessionStore;
+  public sessionStore: any;
   private userIdCounter: number;
   private profileIdCounter: number;
   private jobIdCounter: number;
@@ -286,4 +290,243 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export class DatabaseStorage implements IStorage {
+  public sessionStore: any;
+
+  constructor() {
+    this.sessionStore = new PostgresSessionStore({
+      pool,
+      createTableIfMissing: true
+    });
+  }
+
+  // User operations
+  async getUser(id: number): Promise<User | undefined> {
+    const result = await db.select().from(users).where(eq(users.id, id));
+    return result[0];
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const result = await db.select().from(users).where(eq(users.username, username));
+    return result[0];
+  }
+
+  async getUsers(userType?: string): Promise<User[]> {
+    if (userType) {
+      return db.select().from(users).where(eq(users.userType, userType));
+    }
+    return db.select().from(users);
+  }
+
+  async createUser(user: InsertUser): Promise<User> {
+    const result = await db.insert(users).values(user).returning();
+    return result[0];
+  }
+
+  // Worker profile operations
+  async getWorkerProfile(userId: number): Promise<WorkerProfile | undefined> {
+    const result = await db.select().from(workerProfiles).where(eq(workerProfiles.userId, userId));
+    return result[0];
+  }
+
+  async createWorkerProfile(profile: InsertWorkerProfile): Promise<WorkerProfile> {
+    const result = await db.insert(workerProfiles).values({
+      ...profile,
+      averageRating: 0,
+      totalRatings: 0,
+      verified: false
+    }).returning();
+    return result[0];
+  }
+
+  async updateWorkerProfile(userId: number, update: Partial<WorkerProfile>): Promise<WorkerProfile | undefined> {
+    const profile = await this.getWorkerProfile(userId);
+    if (!profile) return undefined;
+    
+    const result = await db.update(workerProfiles)
+      .set(update)
+      .where(eq(workerProfiles.userId, userId))
+      .returning();
+    
+    return result[0];
+  }
+
+  async getWorkersBySkill(skill: string): Promise<(WorkerProfile & { user: User })[]> {
+    const workers = await db.select()
+      .from(workerProfiles)
+      .where(eq(workerProfiles.primarySkill, skill));
+    
+    return Promise.all(
+      workers.map(async (profile) => {
+        const user = await this.getUser(profile.userId);
+        return { ...profile, user: user! };
+      })
+    );
+  }
+
+  async getTopRatedWorkers(limit: number = 4): Promise<(WorkerProfile & { user: User })[]> {
+    const workers = await db.select()
+      .from(workerProfiles)
+      .orderBy(desc(workerProfiles.averageRating))
+      .limit(limit);
+    
+    return Promise.all(
+      workers.map(async (profile) => {
+        const user = await this.getUser(profile.userId);
+        return { ...profile, user: user! };
+      })
+    );
+  }
+
+  // Job operations
+  async getJob(id: number): Promise<(Job & { employer: User }) | undefined> {
+    const jobResult = await db.select().from(jobs).where(eq(jobs.id, id));
+    const job = jobResult[0];
+    if (!job) return undefined;
+    
+    const employer = await this.getUser(job.employerId);
+    if (!employer) return undefined;
+    
+    return { ...job, employer };
+  }
+
+  async getJobs(filters?: {category?: string, location?: string, isActive?: boolean}): Promise<(Job & { employer: User })[]> {
+    let query = db.select().from(jobs);
+    
+    if (filters) {
+      if (filters.category) {
+        query = query.where(eq(jobs.category, filters.category));
+      }
+      
+      if (filters.location) {
+        query = query.where(like(jobs.location, `%${filters.location}%`));
+      }
+      
+      if (filters.isActive !== undefined) {
+        query = query.where(eq(jobs.isActive, filters.isActive));
+      }
+    }
+    
+    query = query.orderBy(desc(jobs.createdAt));
+    const jobsList = await query;
+    
+    return Promise.all(
+      jobsList.map(async (job) => {
+        const employer = await this.getUser(job.employerId);
+        return { ...job, employer: employer! };
+      })
+    );
+  }
+
+  async createJob(job: InsertJob): Promise<Job> {
+    const result = await db.insert(jobs).values({
+      ...job,
+      isActive: true
+    }).returning();
+    return result[0];
+  }
+
+  async updateJob(id: number, update: Partial<Job>): Promise<Job | undefined> {
+    const result = await db.update(jobs)
+      .set(update)
+      .where(eq(jobs.id, id))
+      .returning();
+    
+    return result[0];
+  }
+
+  async getJobsByEmployer(employerId: number): Promise<Job[]> {
+    return db.select()
+      .from(jobs)
+      .where(eq(jobs.employerId, employerId))
+      .orderBy(desc(jobs.createdAt));
+  }
+
+  // Application operations
+  async getApplication(id: number): Promise<Application | undefined> {
+    const result = await db.select().from(applications).where(eq(applications.id, id));
+    return result[0];
+  }
+
+  async getApplicationsByWorker(workerId: number): Promise<(Application & { job: Job })[]> {
+    const appResults = await db.select()
+      .from(applications)
+      .where(eq(applications.workerId, workerId));
+    
+    return Promise.all(
+      appResults.map(async (app) => {
+        const jobResult = await db.select().from(jobs).where(eq(jobs.id, app.jobId));
+        return { ...app, job: jobResult[0] };
+      })
+    );
+  }
+
+  async getApplicationsByJob(jobId: number): Promise<(Application & { worker: User })[]> {
+    const appResults = await db.select()
+      .from(applications)
+      .where(eq(applications.jobId, jobId));
+    
+    return Promise.all(
+      appResults.map(async (app) => {
+        const worker = await this.getUser(app.workerId);
+        return { ...app, worker: worker! };
+      })
+    );
+  }
+
+  async createApplication(application: InsertApplication): Promise<Application> {
+    const result = await db.insert(applications).values({
+      ...application,
+      status: "pending"
+    }).returning();
+    return result[0];
+  }
+
+  async updateApplicationStatus(id: number, status: string): Promise<Application | undefined> {
+    // Validate the status to ensure it's one of the allowed values
+    const validStatus = ["pending", "accepted", "rejected", "completed"];
+    if (!validStatus.includes(status)) {
+      throw new Error("Invalid application status");
+    }
+    
+    const result = await db.update(applications)
+      .set({ status: status as "pending" | "accepted" | "rejected" | "completed" })
+      .where(eq(applications.id, id))
+      .returning();
+    
+    return result[0];
+  }
+
+  // Rating operations
+  async getRatingsByWorker(workerId: number): Promise<Rating[]> {
+    return db.select()
+      .from(ratings)
+      .where(eq(ratings.workerId, workerId))
+      .orderBy(desc(ratings.createdAt));
+  }
+
+  async createRating(rating: InsertRating): Promise<Rating> {
+    const result = await db.insert(ratings).values({
+      ...rating,
+      comment: rating.comment || null
+    }).returning();
+    
+    // Update worker profile average rating
+    const workerProfile = await this.getWorkerProfile(rating.workerId);
+    if (workerProfile) {
+      const ratings = await this.getRatingsByWorker(rating.workerId);
+      const totalRating = ratings.reduce((sum, r) => sum + r.rating, 0);
+      const averageRating = totalRating / ratings.length;
+      
+      await this.updateWorkerProfile(rating.workerId, {
+        averageRating,
+        totalRatings: ratings.length
+      });
+    }
+    
+    return result[0];
+  }
+}
+
+// Switch from MemStorage to DatabaseStorage
+export const storage = new DatabaseStorage();
