@@ -141,7 +141,17 @@ export default function WorkerProfile() {
     );
   }
 
-  const { user: workerUser, profile, ratings } = data;
+  // Handle missing profile data
+  const { user: workerUser, profile: rawProfile, ratings = [] } = data;
+  // Create default profile if not available
+  const profile = rawProfile || {
+    primarySkill: "General Labor",
+    description: "",
+    isAvailable: true,
+    averageRating: 0,
+    totalRatings: 0,
+    verified: false
+  };
   const hasRated = user && ratings.some(rating => rating.employerId === user.id);
   const isOwnProfile = user && user.id === workerUser.id;
 

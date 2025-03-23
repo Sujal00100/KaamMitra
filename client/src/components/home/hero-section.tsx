@@ -10,17 +10,13 @@ export function HeroSection() {
             <p className="text-lg mb-6">Connecting daily wage workers with employers in your neighborhood. No middlemen, just honest work.</p>
             
             <div className="flex flex-col sm:flex-row gap-4">
-              <Link href="/auth?tab=register&type=worker">
-                <a className="bg-white text-primary font-medium py-3 px-6 rounded flex items-center justify-center">
-                  <span className="material-icons mr-2">person</span>
-                  I'm a Worker
-                </a>
+              <Link href="/auth?tab=register&type=worker" className="bg-white text-primary font-medium py-3 px-6 rounded flex items-center justify-center">
+                <span className="material-icons mr-2">person</span>
+                I'm a Worker
               </Link>
-              <Link href="/auth?tab=register&type=employer">
-                <a className="bg-[#FFA500] text-white font-medium py-3 px-6 rounded flex items-center justify-center">
-                  <span className="material-icons mr-2">business</span>
-                  I'm an Employer
-                </a>
+              <Link href="/auth?tab=register&type=employer" className="bg-[#FFA500] text-white font-medium py-3 px-6 rounded flex items-center justify-center">
+                <span className="material-icons mr-2">business</span>
+                I'm an Employer
               </Link>
             </div>
           </div>

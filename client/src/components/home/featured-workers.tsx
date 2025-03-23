@@ -95,11 +95,9 @@ export function FeaturedWorkers() {
                   <p className="text-neutral-700 text-sm text-center mb-4">
                     {worker.description || `Experienced ${worker.primarySkill} available for work in your area.`}
                   </p>
-                  <Link href={`/workers/${worker.user.id}`}>
-                    <a className="w-full py-2 bg-primary text-white rounded text-center flex items-center justify-center">
-                      <span className="material-icons text-sm mr-1">visibility</span>
-                      <span>View Profile</span>
-                    </a>
+                  <Link href={`/workers/${worker.user.id}`} className="w-full py-2 bg-primary text-white rounded text-center flex items-center justify-center">
+                    <span className="material-icons text-sm mr-1">visibility</span>
+                    <span>View Profile</span>
                   </Link>
                 </div>
               </div>
