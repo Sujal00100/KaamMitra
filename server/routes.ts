@@ -342,28 +342,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Not authenticated" });
       }
       
-      // Skip all the user checks and hardcode a response with the mock profile
-      // This is just for testing if the endpoint can return data
-      const mockProfile = {
-        id: 1,
-        userId: 8,
-        primarySkill: "Carpentry",
-        description: "Skilled carpenter with 8 years of experience in residential and commercial projects.",
-        isAvailable: true,
-        averageRating: 4,
-        totalRatings: 15,
-        verified: true
-      };
-      
-      const mockApplications = [];
-      const mockRatings = [];
-      
-      // Return hardcoded data for now
-      return res.json({ 
-        profile: mockProfile, 
-        applications: mockApplications, 
-        ratings: mockRatings 
-      });
+      try {
+        // Directly fetch the worker profile for a known worker ID (8)
+        const workerId = 8; // Hardcoded ID for testing
+        
+        // Fetch profile from database
+        const profile = await storage.getWorkerProfile(workerId);
+        
+        if (!profile) {
+          return res.status(404).json({ message: "Worker profile not found" });
+        }
+        
+        const applications = await storage.getApplicationsByWorker(workerId);
+        const ratings = await storage.getRatingsByWorker(workerId);
+        
+        return res.json({ 
+          profile, 
+          applications, 
+          ratings 
+        });
+      } catch (dbError) {
+        console.error("Database error:", dbError);
+        return res.status(500).json({ 
+          message: "Database error", 
+          error: dbError instanceof Error ? dbError.message : 'Unknown database error' 
+        });
+      }
     } catch (error) {
       console.error("Worker dashboard error:", error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
