@@ -325,12 +325,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied" });
       }
       
-      const profile = await storage.getWorkerProfile(req.user.id);
+      // Check if profile exists, if not create default profile
+      let profile = await storage.getWorkerProfile(req.user.id);
+      if (!profile) {
+        // Create a default profile for the worker
+        profile = await storage.createWorkerProfile({
+          userId: req.user.id,
+          primarySkill: "general", // Default skill
+          description: "",
+          isAvailable: true
+        });
+      }
+      
       const applications = await storage.getApplicationsByWorker(req.user.id);
       const ratings = await storage.getRatingsByWorker(req.user.id);
       
       res.json({ profile, applications, ratings });
     } catch (error) {
+      console.error("Worker dashboard error:", error);
       res.status(500).json({ message: "Failed to fetch dashboard data" });
     }
   });

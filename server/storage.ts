@@ -38,7 +38,7 @@ export interface IStorage {
   getApplicationsByWorker(workerId: number): Promise<(Application & { job: Job })[]>;
   getApplicationsByJob(jobId: number): Promise<(Application & { worker: User })[]>;
   createApplication(application: InsertApplication): Promise<Application>;
-  updateApplicationStatus(id: number, status: string): Promise<Application | undefined>;
+  updateApplicationStatus(id: number, status: "pending" | "accepted" | "rejected" | "completed"): Promise<Application | undefined>;
   
   // Rating operations
   getRatingsByWorker(workerId: number): Promise<Rating[]>;
@@ -251,7 +251,7 @@ export class MemStorage implements IStorage {
     return application;
   }
 
-  async updateApplicationStatus(id: number, status: string): Promise<Application | undefined> {
+  async updateApplicationStatus(id: number, status: "pending" | "accepted" | "rejected" | "completed"): Promise<Application | undefined> {
     const application = this.applications.get(id);
     if (!application) return undefined;
     
@@ -482,15 +482,9 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async updateApplicationStatus(id: number, status: string): Promise<Application | undefined> {
-    // Validate the status to ensure it's one of the allowed values
-    const validStatus = ["pending", "accepted", "rejected", "completed"];
-    if (!validStatus.includes(status)) {
-      throw new Error("Invalid application status");
-    }
-    
+  async updateApplicationStatus(id: number, status: "pending" | "accepted" | "rejected" | "completed"): Promise<Application | undefined> {
     const result = await db.update(applications)
-      .set({ status: status as "pending" | "accepted" | "rejected" | "completed" })
+      .set({ status })
       .where(eq(applications.id, id))
       .returning();
     
