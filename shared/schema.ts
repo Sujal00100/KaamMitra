@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -13,6 +13,13 @@ export const users = pgTable("users", {
   userType: text("user_type", { enum: ["worker", "employer"] }).notNull(),
   location: text("location").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  // New verification fields
+  dateOfBirth: date("date_of_birth"),
+  age: integer("age"),
+  isVerified: boolean("is_verified").default(false),
+  verificationStatus: text("verification_status", { 
+    enum: ["not_submitted", "pending", "verified", "rejected"] 
+  }).default("not_submitted").notNull(),
 });
 
 // Worker profiles with skills and ratings
@@ -59,6 +66,20 @@ export const ratings = pgTable("ratings", {
   rating: integer("rating").notNull(),
   comment: text("comment"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Government ID verification documents
+export const verificationDocuments = pgTable("verification_documents", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  documentType: text("document_type", { 
+    enum: ["aadhar_card", "voter_id", "passport", "driving_license", "pan_card", "other"] 
+  }).notNull(),
+  documentNumber: text("document_number").notNull(),
+  documentImageUrl: text("document_image_url"), // URL or reference to where the document is stored
+  verificationNotes: text("verification_notes"),
+  submittedAt: timestamp("submitted_at").defaultNow().notNull(),
+  reviewedAt: timestamp("reviewed_at"),
 });
 
 // Create insert schemas
