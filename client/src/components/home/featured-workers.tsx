@@ -78,7 +78,7 @@ export function FeaturedWorkers() {
                   <p className="text-primary font-medium">{worker.primarySkill}</p>
                   <div className="flex items-center my-2">
                     {[...Array(5)].map((_, i) => (
-                      <span key={i} className="material-icons text-yellow-500">
+                      <span key={`star-${worker.id}-${i}`} className="material-icons text-yellow-500">
                         {i < Math.floor(worker.averageRating) 
                           ? "star" 
                           : i === Math.floor(worker.averageRating) && worker.averageRating % 1 >= 0.5 
