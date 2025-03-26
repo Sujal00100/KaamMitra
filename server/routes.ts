@@ -440,11 +440,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create verification document
       const document = await storage.createVerificationDocument({
         userId: req.user.id,
-        documentType: "Government ID",
+        documentType: "aadhar_card", // Default to Aadhar, can be changed based on user input
         documentNumber: data.govtId,
-        submittedAt: new Date(),
-        documentPath: req.file ? req.file.path : null,
-        status: "pending",
+        documentImageUrl: req.file ? req.file.path : null,
       });
       
       res.status(201).json({ 

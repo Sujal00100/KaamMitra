@@ -1,4 +1,4 @@
-import { Metadata } from "@tanstack/react-query";
+
 import { VerificationForm } from "@/components/verification/verification-form";
 import { useAuth } from "@/hooks/use-auth";
 import { Redirect } from "wouter";

@@ -89,6 +89,11 @@ export function Navbar() {
                       Dashboard
                     </Link>
                   </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/verification">
+                      Verify Account {user.verificationStatus === "verified" && "✓"}
+                    </Link>
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleLogout}>
                     Logout
                   </DropdownMenuItem>
@@ -154,6 +159,13 @@ export function Navbar() {
                         onClick={() => setMobileMenuOpen(false)}
                       >
                         Dashboard
+                      </Link>
+                      <Link
+                        href="/verification"
+                        className="block py-2 text-neutral-700 hover:text-primary"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        Verify Account {user.verificationStatus === "verified" && "✓"}
                       </Link>
                       {user.userType === "employer" && (
                         <Link
