@@ -3,9 +3,10 @@ import { workerProfiles, type WorkerProfile, type InsertWorkerProfile } from "@s
 import { jobs, type Job, type InsertJob } from "@shared/schema";
 import { applications, type Application, type InsertApplication } from "@shared/schema";
 import { ratings, type Rating, type InsertRating } from "@shared/schema";
+import { verificationDocuments, type VerificationDocument, type InsertVerificationDocument } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
-import { eq, desc, and, like } from "drizzle-orm";
+import { eq, desc, and, like, sql } from "drizzle-orm";
 import connectPgSimple from "connect-pg-simple";
 import { db, pool } from "./db";
 
@@ -309,21 +310,24 @@ export class DatabaseStorage implements IStorage {
   // User operations
   async getUser(id: number): Promise<User | undefined> {
     try {
-      const result = await db.select({
-        id: users.id,
-        username: users.username,
-        password: users.password,
-        fullName: users.fullName,
-        phone: users.phone,
-        email: users.email,
-        userType: users.userType,
-        location: users.location,
-        createdAt: users.createdAt
-      })
-      .from(users)
-      .where(eq(users.id, id));
+      // Use raw SQL to handle schema evolution more gracefully
+      const result = await db.execute(sql`
+        SELECT 
+          id, username, password, full_name as "fullName",
+          phone, email, user_type as "userType", location,
+          created_at as "createdAt", 
+          date_of_birth as "dateOfBirth",
+          age, is_verified as "isVerified",
+          verification_status as "verificationStatus"
+        FROM users
+        WHERE id = ${id}
+      `);
       
-      return result[0];
+      if (result.rows.length === 0) {
+        return undefined;
+      }
+      
+      return result.rows[0];
     } catch (error) {
       console.error("Error in getUser:", error);
       throw error;
@@ -332,21 +336,24 @@ export class DatabaseStorage implements IStorage {
 
   async getUserByUsername(username: string): Promise<User | undefined> {
     try {
-      const result = await db.select({
-        id: users.id,
-        username: users.username,
-        password: users.password,
-        fullName: users.fullName,
-        phone: users.phone,
-        email: users.email,
-        userType: users.userType,
-        location: users.location,
-        createdAt: users.createdAt
-      })
-      .from(users)
-      .where(eq(users.username, username));
+      // Use raw SQL to handle schema evolution more gracefully
+      const result = await db.execute(sql`
+        SELECT 
+          id, username, password, full_name as "fullName",
+          phone, email, user_type as "userType", location,
+          created_at as "createdAt", 
+          date_of_birth as "dateOfBirth",
+          age, is_verified as "isVerified",
+          verification_status as "verificationStatus"
+        FROM users
+        WHERE username = ${username}
+      `);
       
-      return result[0];
+      if (result.rows.length === 0) {
+        return undefined;
+      }
+      
+      return result.rows[0];
     } catch (error) {
       console.error("Error in getUserByUsername:", error);
       throw error;
@@ -391,8 +398,29 @@ export class DatabaseStorage implements IStorage {
 
   async createUser(user: InsertUser): Promise<User> {
     try {
-      const result = await db.insert(users).values(user).returning();
-      return result[0];
+      // Use simple query to avoid column mismatch issues with schema changes
+      const result = await db.execute(sql`
+        INSERT INTO users (
+          username, password, full_name, phone, email, user_type, 
+          location, verification_status
+        ) VALUES (
+          ${user.username}, 
+          ${user.password}, 
+          ${user.fullName}, 
+          ${user.phone}, 
+          ${user.email || null}, 
+          ${user.userType}, 
+          ${user.location}, 
+          'not_submitted'
+        ) RETURNING 
+          id, username, password, full_name as "fullName", 
+          phone, email, user_type as "userType", location, 
+          created_at as "createdAt", date_of_birth as "dateOfBirth",
+          age, is_verified as "isVerified",
+          verification_status as "verificationStatus"
+      `);
+      
+      return result.rows[0];
     } catch (error) {
       console.error("Error in createUser:", error);
       throw error;
