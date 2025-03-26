@@ -2,8 +2,29 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
-import { insertJobSchema, insertApplicationSchema, insertRatingSchema } from "@shared/schema";
+import { insertJobSchema, insertApplicationSchema, insertRatingSchema, insertVerificationDocumentSchema } from "@shared/schema";
 import { z } from "zod";
+import multer from "multer";
+import fs from "fs";
+import path from "path";
+
+// Configure multer storage
+const storage_config = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadDir = path.join(process.cwd(), "uploads");
+    // Make sure the directory exists
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({ storage: storage_config });
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication routes
@@ -375,6 +396,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Worker dashboard error:", error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       res.status(500).json({ message: "Failed to fetch worker dashboard data", error: errorMessage });
+    }
+  });
+
+  // POST submit verification
+  app.post("/api/verification/submit", upload.single('document'), async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const verificationSchema = z.object({
+        govtId: z.string().min(1, "Government ID is required"),
+        dateOfBirth: z.string().transform(val => new Date(val)),
+        address: z.string().min(1, "Address is required"),
+      });
+      
+      // Validate the incoming data
+      const data = verificationSchema.parse(req.body);
+      
+      // Calculate age from date of birth
+      const dob = data.dateOfBirth;
+      const today = new Date();
+      const age = today.getFullYear() - dob.getFullYear() - 
+        (today.getMonth() < dob.getMonth() || 
+        (today.getMonth() === dob.getMonth() && today.getDate() < dob.getDate()) ? 1 : 0);
+      
+      // Check if age is at least 18
+      if (age < 18) {
+        return res.status(400).json({ message: "You must be at least 18 years old" });
+      }
+      
+      // Update user with verification status
+      const updatedUser = await storage.updateUserVerification(
+        req.user.id, 
+        "pending"
+      );
+      
+      if (!updatedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Create verification document
+      const document = await storage.createVerificationDocument({
+        userId: req.user.id,
+        documentType: "Government ID",
+        documentNumber: data.govtId,
+        submittedAt: new Date(),
+        documentPath: req.file ? req.file.path : null,
+        status: "pending",
+      });
+      
+      res.status(201).json({ 
+        message: "Verification submitted successfully",
+        user: updatedUser
+      });
+    } catch (error) {
+      console.error("Verification submission error:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: "Invalid verification data", 
+          errors: error.errors 
+        });
+      }
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({ 
+        message: "Failed to submit verification", 
+        error: errorMessage 
+      });
     }
   });
 
