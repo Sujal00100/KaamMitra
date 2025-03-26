@@ -18,6 +18,7 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   getUsers(userType?: string): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
+  updateUserVerification(id: number, verificationStatus: "not_submitted" | "pending" | "verified" | "rejected"): Promise<User | undefined>;
   
   // Worker profile operations
   getWorkerProfile(userId: number): Promise<WorkerProfile | undefined>;
@@ -43,6 +44,11 @@ export interface IStorage {
   // Rating operations
   getRatingsByWorker(workerId: number): Promise<Rating[]>;
   createRating(rating: InsertRating): Promise<Rating>;
+  
+  // Verification operations
+  getVerificationDocuments(userId: number): Promise<VerificationDocument[]>;
+  createVerificationDocument(document: InsertVerificationDocument): Promise<VerificationDocument>;
+  updateVerificationDocument(id: number, reviewNotes?: string, reviewedAt?: Date): Promise<VerificationDocument | undefined>;
   
   // Session store for authentication
   sessionStore: any;
@@ -303,7 +309,20 @@ export class DatabaseStorage implements IStorage {
   // User operations
   async getUser(id: number): Promise<User | undefined> {
     try {
-      const result = await db.select().from(users).where(eq(users.id, id));
+      const result = await db.select({
+        id: users.id,
+        username: users.username,
+        password: users.password,
+        fullName: users.fullName,
+        phone: users.phone,
+        email: users.email,
+        userType: users.userType,
+        location: users.location,
+        createdAt: users.createdAt
+      })
+      .from(users)
+      .where(eq(users.id, id));
+      
       return result[0];
     } catch (error) {
       console.error("Error in getUser:", error);
@@ -313,7 +332,20 @@ export class DatabaseStorage implements IStorage {
 
   async getUserByUsername(username: string): Promise<User | undefined> {
     try {
-      const result = await db.select().from(users).where(eq(users.username, username));
+      const result = await db.select({
+        id: users.id,
+        username: users.username,
+        password: users.password,
+        fullName: users.fullName,
+        phone: users.phone,
+        email: users.email,
+        userType: users.userType,
+        location: users.location,
+        createdAt: users.createdAt
+      })
+      .from(users)
+      .where(eq(users.username, username));
+      
       return result[0];
     } catch (error) {
       console.error("Error in getUserByUsername:", error);
@@ -324,9 +356,33 @@ export class DatabaseStorage implements IStorage {
   async getUsers(userType?: string): Promise<User[]> {
     try {
       if (userType) {
-        return await db.select().from(users).where(eq(users.userType, userType));
+        return await db.select({
+          id: users.id,
+          username: users.username,
+          password: users.password,
+          fullName: users.fullName,
+          phone: users.phone,
+          email: users.email,
+          userType: users.userType,
+          location: users.location,
+          createdAt: users.createdAt
+        })
+        .from(users)
+        .where(eq(users.userType, userType));
       }
-      return await db.select().from(users);
+      
+      return await db.select({
+        id: users.id,
+        username: users.username,
+        password: users.password,
+        fullName: users.fullName,
+        phone: users.phone,
+        email: users.email,
+        userType: users.userType,
+        location: users.location,
+        createdAt: users.createdAt
+      })
+      .from(users);
     } catch (error) {
       console.error("Error in getUsers:", error);
       throw error;
@@ -606,6 +662,82 @@ export class DatabaseStorage implements IStorage {
     }
     
     return result[0];
+  }
+
+  // Update a user's verification status
+  async updateUserVerification(id: number, verificationStatus: "not_submitted" | "pending" | "verified" | "rejected"): Promise<User | undefined> {
+    try {
+      const isVerified = verificationStatus === "verified";
+      const result = await db.update(users)
+        .set({ 
+          verificationStatus,
+          isVerified
+        })
+        .where(eq(users.id, id))
+        .returning();
+      
+      return result[0];
+    } catch (error) {
+      console.error("Error in updateUserVerification:", error);
+      throw error;
+    }
+  }
+  
+  // Get verification documents for a user
+  async getVerificationDocuments(userId: number): Promise<VerificationDocument[]> {
+    try {
+      const result = await db.select()
+        .from(verificationDocuments)
+        .where(eq(verificationDocuments.userId, userId))
+        .orderBy(desc(verificationDocuments.submittedAt));
+      
+      return result;
+    } catch (error) {
+      console.error("Error in getVerificationDocuments:", error);
+      throw error;
+    }
+  }
+  
+  // Create a new verification document entry
+  async createVerificationDocument(document: InsertVerificationDocument): Promise<VerificationDocument> {
+    try {
+      const result = await db.insert(verificationDocuments)
+        .values(document)
+        .returning();
+      
+      // Update the user's verification status to "pending"
+      await this.updateUserVerification(document.userId, "pending");
+      
+      return result[0];
+    } catch (error) {
+      console.error("Error in createVerificationDocument:", error);
+      throw error;
+    }
+  }
+  
+  // Update an existing verification document (typically during review)
+  async updateVerificationDocument(id: number, reviewNotes?: string, reviewedAt?: Date): Promise<VerificationDocument | undefined> {
+    try {
+      const updates: any = {};
+      
+      if (reviewNotes !== undefined) {
+        updates.verificationNotes = reviewNotes;
+      }
+      
+      if (reviewedAt !== undefined) {
+        updates.reviewedAt = reviewedAt;
+      }
+      
+      const result = await db.update(verificationDocuments)
+        .set(updates)
+        .where(eq(verificationDocuments.id, id))
+        .returning();
+      
+      return result[0];
+    } catch (error) {
+      console.error("Error in updateVerificationDocument:", error);
+      throw error;
+    }
   }
 }
 

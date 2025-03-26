@@ -112,6 +112,12 @@ export const insertRatingSchema = createInsertSchema(ratings).omit({
   createdAt: true,
 });
 
+export const insertVerificationDocumentSchema = createInsertSchema(verificationDocuments).omit({
+  id: true,
+  submittedAt: true,
+  reviewedAt: true,
+});
+
 // Export types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -127,3 +133,6 @@ export type InsertApplication = z.infer<typeof insertApplicationSchema>;
 
 export type Rating = typeof ratings.$inferSelect;
 export type InsertRating = z.infer<typeof insertRatingSchema>;
+
+export type VerificationDocument = typeof verificationDocuments.$inferSelect;
+export type InsertVerificationDocument = z.infer<typeof insertVerificationDocumentSchema>;
