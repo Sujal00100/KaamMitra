@@ -100,7 +100,11 @@ export async function sendVerificationEmail(user: User): Promise<boolean> {
     
     // If using ethereal, provide preview URL
     if (info.messageId && info.messageId.includes('ethereal')) {
-      console.log('Preview URL: %s', nodemailer.getTestMessageUrl(info));
+      const previewUrl = nodemailer.getTestMessageUrl(info);
+      console.log('=====================================================');
+      console.log('EMAIL SENT TO ETHEREAL TEST ACCOUNT');
+      console.log('EMAIL PREVIEW URL: %s', previewUrl);
+      console.log('=====================================================');
     }
     
     return true;

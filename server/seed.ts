@@ -38,7 +38,9 @@ export async function seedDatabase() {
       phone: "+91 9876543210",
       email: "rajeev@example.com",
       userType: "employer",
-      location: "Delhi, India"
+      location: "Delhi, India",
+      emailVerified: true,
+      verificationStatus: "verified"
     }).returning();
     
     const employer2 = await db.insert(users).values({
@@ -48,7 +50,9 @@ export async function seedDatabase() {
       phone: "+91 9871234567",
       email: "anjali@example.com",
       userType: "employer",
-      location: "Mumbai, India"
+      location: "Mumbai, India",
+      emailVerified: true,
+      verificationStatus: "verified"
     }).returning();
     
     // Create some test workers
@@ -60,7 +64,9 @@ export async function seedDatabase() {
       phone: "+91 8765432109",
       email: "suresh@example.com",
       userType: "worker",
-      location: "Delhi, India"
+      location: "Delhi, India",
+      emailVerified: true,
+      verificationStatus: "verified"
     }).returning();
     
     const worker2 = await db.insert(users).values({
@@ -70,7 +76,9 @@ export async function seedDatabase() {
       phone: "+91 8877665544",
       email: "priya@example.com",
       userType: "worker",
-      location: "Gurgaon, India"
+      location: "Gurgaon, India",
+      emailVerified: true,
+      verificationStatus: "verified"
     }).returning();
     
     const worker3 = await db.insert(users).values({
@@ -80,7 +88,8 @@ export async function seedDatabase() {
       phone: "+91 7766554433",
       email: "rajesh@example.com",
       userType: "worker",
-      location: "Noida, India"
+      location: "Noida, India",
+      emailVerified: true
     }).returning();
     
     // Create worker profiles

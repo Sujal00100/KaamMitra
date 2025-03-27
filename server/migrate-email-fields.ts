@@ -75,17 +75,7 @@ async function migrateEmailFields() {
   }
 }
 
-// If this file is run directly, execute the migration
-if (require.main === module) {
-  migrateEmailFields()
-    .then(() => {
-      console.log('Migration completed, exiting.');
-      process.exit(0);
-    })
-    .catch((error) => {
-      console.error('Migration failed:', error);
-      process.exit(1);
-    });
-}
+// We won't auto-run this in ESM modules
+// The migration will be called directly from routes.ts
 
 export default migrateEmailFields;
