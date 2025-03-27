@@ -4,9 +4,9 @@ import { User } from '@shared/schema';
 
 let transporter: nodemailer.Transporter | null = null;
 
-export function initEmailService() {
+export async function initEmailService() {
   if (transporter) {
-    return;
+    return transporter;
   }
 
   const host = process.env.EMAIL_HOST || 'smtp.ethereal.email';
@@ -18,7 +18,8 @@ export function initEmailService() {
   // If no credentials provided, create test account
   if (!user || !pass) {
     console.log('No email credentials provided, creating test account...');
-    nodemailer.createTestAccount().then(testAccount => {
+    try {
+      const testAccount = await nodemailer.createTestAccount();
       console.log('Test email account created:', testAccount.user);
       console.log('Test email password:', testAccount.pass);
       console.log('Test email SMTP server:', testAccount.smtp.host);
@@ -32,7 +33,10 @@ export function initEmailService() {
           pass: testAccount.pass,
         },
       });
-    });
+    } catch (error) {
+      console.error('Error creating test email account:', error);
+      throw error;
+    }
   } else {
     transporter = nodemailer.createTransport({
       host,
@@ -44,6 +48,8 @@ export function initEmailService() {
       },
     });
   }
+  
+  return transporter;
 }
 
 export function generateVerificationCode(): string {
@@ -52,17 +58,17 @@ export function generateVerificationCode(): string {
 }
 
 export async function sendVerificationEmail(user: User): Promise<boolean> {
-  if (!transporter) {
-    console.error('Email transporter not initialized');
-    return false;
-  }
-
   if (!user.email) {
     console.error('User has no email address');
     return false;
   }
 
   try {
+    // Make sure transporter is initialized
+    if (!transporter) {
+      transporter = await initEmailService();
+    }
+
     // Generate a verification code
     const code = generateVerificationCode();
     
@@ -72,6 +78,8 @@ export async function sendVerificationEmail(user: User): Promise<boolean> {
     
     // Store the verification code in the database
     await storage.updateUserVerificationCode(user.id, code, expires);
+    
+    console.log(`Generated verification code for user ${user.id}: ${code}`);
     
     // Send the email
     const info = await transporter.sendMail({
