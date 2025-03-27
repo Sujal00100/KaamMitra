@@ -9,9 +9,10 @@ export async function initEmailService() {
     return transporter;
   }
 
-  const host = process.env.EMAIL_HOST || 'smtp.ethereal.email';
+  // Default to Gmail settings if not explicitly provided
+  const host = process.env.EMAIL_HOST || 'smtp.gmail.com';
   const port = parseInt(process.env.EMAIL_PORT || '587');
-  const secure = process.env.EMAIL_SECURE === 'true';
+  const secure = process.env.EMAIL_SECURE === 'true' || false;
   const user = process.env.EMAIL_USER;
   const pass = process.env.EMAIL_PASSWORD;
 
@@ -46,7 +47,13 @@ export async function initEmailService() {
         user,
         pass,
       },
+      tls: {
+        // Do not fail on invalid certificates
+        rejectUnauthorized: false
+      }
     });
+    
+    console.log(`Email service initialized with: ${user}`);
   }
   
   return transporter;
@@ -83,7 +90,7 @@ export async function sendVerificationEmail(user: User): Promise<boolean> {
     
     // Send the email
     const info = await transporter.sendMail({
-      from: process.env.EMAIL_FROM || '"KaamMitra Support" <support@kaammitra.com>',
+      from: process.env.EMAIL_FROM || `"KaamMitra Support" <${process.env.EMAIL_USER}>`,
       to: user.email,
       subject: 'Verify your email address - KaamMitra',
       text: `Welcome to KaamMitra! Your verification code is: ${code}\n\nThis code will expire in 24 hours.\n\nThank you,\nThe KaamMitra Team`,

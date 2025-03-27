@@ -2,6 +2,8 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { seedDatabase } from "./seed";
+import { initEmailService } from "./email-service";
+import migrateEmailFields from "./migrate-email-fields";
 
 const app = express();
 app.use(express.json());
@@ -41,8 +43,16 @@ app.use((req, res, next) => {
   try {
     // Seed the database with initial data
     await seedDatabase();
+    
+    // Make sure email fields are migrated
+    await migrateEmailFields();
+    console.log("Email verification fields migration completed successfully");
+    
+    // Initialize the email service
+    await initEmailService();
+    console.log("Email service initialized successfully");
   } catch (error) {
-    console.error("Failed to seed database:", error);
+    console.error("Failed to initialize:", error);
   }
 
   const server = await registerRoutes(app);

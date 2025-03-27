@@ -8,6 +8,7 @@ import multer from "multer";
 import fs from "fs";
 import path from "path";
 import migrateEmailFields from "./migrate-email-fields";
+import { sendVerificationEmail, verifyEmail } from "./email-service";
 
 // Configure multer storage
 const storage_config = multer.diskStorage({
@@ -470,6 +471,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ 
         message: "Failed to submit verification", 
         error: errorMessage 
+      });
+    }
+  });
+
+  // POST verify email
+  app.post("/api/verify-email", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const schema = z.object({
+        code: z.string().min(6).max(6)
+      });
+      
+      const { code } = schema.parse(req.body);
+      
+      // Use our email verification function from email-service.ts
+      const success = await verifyEmail(req.user.id, code);
+      
+      if (success) {
+        return res.json({ 
+          success: true,
+          message: "Email verified successfully"
+        });
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid or expired verification code"
+        });
+      }
+    } catch (error) {
+      console.error("Email verification error:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          success: false,
+          message: "Invalid verification code format", 
+          errors: error.errors 
+        });
+      }
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      return res.status(500).json({ 
+        success: false,
+        message: "Failed to verify email", 
+        error: errorMessage 
+      });
+    }
+  });
+  
+  // POST resend verification email
+  app.post("/api/resend-verification", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      // Get the user
+      const user = await storage.getUser(req.user.id);
+      
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found"
+        });
+      }
+      
+      // Check if the user has already verified their email
+      if (user.emailVerified) {
+        return res.json({
+          success: true,
+          message: "Email already verified"
+        });
+      }
+      
+      // Send a new verification email
+      const emailSent = await sendVerificationEmail(user);
+      
+      if (emailSent) {
+        return res.json({
+          success: true,
+          message: "Verification email sent successfully"
+        });
+      } else {
+        return res.status(500).json({
+          success: false,
+          message: "Failed to send verification email"
+        });
+      }
+    } catch (error) {
+      console.error("Resend verification email error:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      return res.status(500).json({
+        success: false,
+        message: "Failed to resend verification email",
+        error: errorMessage
       });
     }
   });
