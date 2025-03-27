@@ -417,6 +417,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const verificationSchema = z.object({
+        govtIdType: z.enum(["aadhar_card", "voter_id", "passport", "driving_license", "pan_card"], {
+          required_error: "ID type is required"
+        }),
         govtId: z.string().min(1, "Government ID is required"),
         dateOfBirth: z.string().transform(val => new Date(val)),
         address: z.string().min(1, "Address is required"),
@@ -437,6 +440,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "You must be at least 18 years old" });
       }
       
+      // Verify document file was uploaded
+      if (!req.file) {
+        return res.status(400).json({ message: "ID document image is required" });
+      }
+      
+      // Check file size (max 5MB)
+      const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB in bytes
+      if (req.file.size > MAX_FILE_SIZE) {
+        return res.status(400).json({ message: "File size exceeds the 5MB limit" });
+      }
+      
+      // Check file type
+      const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
+      if (!allowedMimeTypes.includes(req.file.mimetype)) {
+        return res.status(400).json({ message: "Only JPEG, PNG, and WebP images are allowed" });
+      }
+      
       // Update user with verification status
       const updatedUser = await storage.updateUserVerification(
         req.user.id, 
@@ -450,9 +470,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create verification document
       const document = await storage.createVerificationDocument({
         userId: req.user.id,
-        documentType: "aadhar_card", // Default to Aadhar, can be changed based on user input
+        documentType: data.govtIdType,
         documentNumber: data.govtId,
-        documentImageUrl: req.file ? req.file.path : null,
+        documentImageUrl: req.file.path,
       });
       
       res.status(201).json({ 
