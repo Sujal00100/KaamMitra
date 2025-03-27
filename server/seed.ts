@@ -89,7 +89,8 @@ export async function seedDatabase() {
       email: "rajesh@example.com",
       userType: "worker",
       location: "Noida, India",
-      emailVerified: true
+      emailVerified: true,
+      verificationStatus: "pending"
     }).returning();
     
     // Create worker profiles
