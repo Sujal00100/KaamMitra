@@ -7,6 +7,7 @@ import { z } from "zod";
 import multer from "multer";
 import fs from "fs";
 import path from "path";
+import migrateEmailFields from "./migrate-email-fields";
 
 // Configure multer storage
 const storage_config = multer.diskStorage({
@@ -27,6 +28,14 @@ const storage_config = multer.diskStorage({
 const upload = multer({ storage: storage_config });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Run email verification fields migration
+  try {
+    await migrateEmailFields();
+    console.log("Email verification fields migration completed successfully");
+  } catch (error) {
+    console.error("Error during email verification migration:", error);
+  }
+  
   // Set up authentication routes
   setupAuth(app);
 

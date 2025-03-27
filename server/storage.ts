@@ -20,6 +20,8 @@ export interface IStorage {
   getUsers(userType?: string): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
   updateUserVerification(id: number, verificationStatus: "not_submitted" | "pending" | "verified" | "rejected"): Promise<User | undefined>;
+  updateUserVerificationCode(userId: number, code: string, expires: Date): Promise<User | undefined>;
+  updateUserEmailVerification(userId: number, verified: boolean): Promise<User | undefined>;
   
   // Worker profile operations
   getWorkerProfile(userId: number): Promise<WorkerProfile | undefined>;
@@ -108,6 +110,38 @@ export class MemStorage implements IStorage {
     const user: User = { ...insertUser, id, createdAt };
     this.users.set(id, user);
     return user;
+  }
+
+  async updateUserVerification(id: number, verificationStatus: "not_submitted" | "pending" | "verified" | "rejected"): Promise<User | undefined> {
+    const user = this.users.get(id);
+    if (!user) return undefined;
+    
+    const isVerified = verificationStatus === "verified";
+    const updatedUser = { ...user, verificationStatus, isVerified };
+    this.users.set(id, updatedUser);
+    return updatedUser;
+  }
+  
+  async updateUserVerificationCode(userId: number, code: string, expires: Date): Promise<User | undefined> {
+    const user = this.users.get(userId);
+    if (!user) return undefined;
+    
+    const updatedUser = { 
+      ...user, 
+      verificationCode: code,
+      verificationCodeExpires: expires 
+    };
+    this.users.set(userId, updatedUser);
+    return updatedUser;
+  }
+  
+  async updateUserEmailVerification(userId: number, verified: boolean): Promise<User | undefined> {
+    const user = this.users.get(userId);
+    if (!user) return undefined;
+    
+    const updatedUser = { ...user, emailVerified: verified };
+    this.users.set(userId, updatedUser);
+    return updatedUser;
   }
 
   // Worker profile operations
@@ -294,6 +328,35 @@ export class MemStorage implements IStorage {
     }
     
     return rating;
+  }
+
+  // Verification document operations
+  async getVerificationDocuments(userId: number): Promise<VerificationDocument[]> {
+    // In-memory implementation would need to store verification documents
+    // This is just a placeholder implementation
+    return [];
+  }
+  
+  async createVerificationDocument(document: InsertVerificationDocument): Promise<VerificationDocument> {
+    // In-memory implementation would need to store verification documents
+    // This is just a placeholder implementation
+    const now = new Date();
+    return {
+      id: 1,
+      userId: document.userId,
+      documentType: document.documentType,
+      documentNumber: document.documentNumber,
+      documentImageUrl: document.documentImageUrl,
+      verificationNotes: "",
+      submittedAt: now,
+      reviewedAt: null
+    };
+  }
+  
+  async updateVerificationDocument(id: number, reviewNotes?: string, reviewedAt?: Date): Promise<VerificationDocument | undefined> {
+    // In-memory implementation would need to store verification documents
+    // This is just a placeholder implementation
+    return undefined;
   }
 }
 
@@ -707,6 +770,39 @@ export class DatabaseStorage implements IStorage {
       return result[0];
     } catch (error) {
       console.error("Error in updateUserVerification:", error);
+      throw error;
+    }
+  }
+
+  // Update a user's email verification code
+  async updateUserVerificationCode(userId: number, code: string, expires: Date): Promise<User | undefined> {
+    try {
+      const result = await db.update(users)
+        .set({ 
+          verificationCode: code,
+          verificationCodeExpires: expires
+        })
+        .where(eq(users.id, userId))
+        .returning();
+      
+      return result[0];
+    } catch (error) {
+      console.error("Error in updateUserVerificationCode:", error);
+      throw error;
+    }
+  }
+
+  // Update a user's email verification status
+  async updateUserEmailVerification(userId: number, verified: boolean): Promise<User | undefined> {
+    try {
+      const result = await db.update(users)
+        .set({ emailVerified: verified })
+        .where(eq(users.id, userId))
+        .returning();
+      
+      return result[0];
+    } catch (error) {
+      console.error("Error in updateUserEmailVerification:", error);
       throw error;
     }
   }

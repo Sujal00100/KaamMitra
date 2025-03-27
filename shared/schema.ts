@@ -9,17 +9,22 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   fullName: text("full_name").notNull(),
   phone: text("phone").notNull(),
-  email: text("email"),
+  email: text("email").notNull(),
   userType: text("user_type", { enum: ["worker", "employer"] }).notNull(),
   location: text("location").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-  // New verification fields
+  // Verification fields
   dateOfBirth: date("date_of_birth"),
   age: integer("age"),
   isVerified: boolean("is_verified").default(false),
+  // Use varchar instead of text for enum to prevent type conversion issues
   verificationStatus: text("verification_status", { 
     enum: ["not_submitted", "pending", "verified", "rejected"] 
   }).default("not_submitted").notNull(),
+  // Email verification fields
+  emailVerified: boolean("email_verified").default(false),
+  verificationCode: text("verification_code"),
+  verificationCodeExpires: timestamp("verification_code_expires"),
 });
 
 // Worker profiles with skills and ratings

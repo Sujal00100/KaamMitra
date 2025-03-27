@@ -6,6 +6,7 @@ import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
 import { User as SelectUser } from "@shared/schema";
+import { initEmailService, sendVerificationEmail, verifyEmail } from "./email-service";
 
 declare global {
   namespace Express {
@@ -29,6 +30,9 @@ async function comparePasswords(supplied: string, stored: string) {
 }
 
 export function setupAuth(app: Express) {
+  // Initialize email service
+  initEmailService();
+  
   const sessionSecret = process.env.SESSION_SECRET || "kaammitra-session-secret";
   
   const sessionSettings: session.SessionOptions = {
@@ -95,6 +99,11 @@ export function setupAuth(app: Express) {
       if (existingUser) {
         return res.status(400).json({ message: "Username already exists" });
       }
+      
+      // Validate email is required
+      if (!req.body.email) {
+        return res.status(400).json({ message: "Email is required for registration" });
+      }
 
       const user = await storage.createUser({
         ...req.body,
@@ -110,13 +119,29 @@ export function setupAuth(app: Express) {
           isAvailable: true
         });
       }
+      
+      // Send verification email
+      try {
+        const emailSent = await sendVerificationEmail(user);
+        if (emailSent) {
+          console.log("Verification email sent successfully to:", user.email);
+        } else {
+          console.warn("Failed to send verification email to:", user.email);
+        }
+      } catch (emailError) {
+        console.error("Error sending verification email:", emailError);
+        // Continue the registration process even if email sending fails
+      }
 
       req.login(user, (err) => {
         if (err) return next(err);
         
         // Return user without password
         const { password, ...userWithoutPassword } = user;
-        res.status(201).json(userWithoutPassword);
+        res.status(201).json({
+          ...userWithoutPassword,
+          message: "Registration successful. Please check your email for a verification code."
+        });
       });
     } catch (error) {
       next(error);
@@ -160,5 +185,64 @@ export function setupAuth(app: Express) {
     // Return user without password
     const { password, ...userWithoutPassword } = req.user;
     res.json(userWithoutPassword);
+  });
+  
+  // Email verification endpoint
+  app.post("/api/verify-email", async (req, res, next) => {
+    try {
+      const { userId, code } = req.body;
+      
+      if (!userId || !code) {
+        return res.status(400).json({ message: "User ID and verification code are required" });
+      }
+      
+      const isVerified = await verifyEmail(parseInt(userId), code);
+      
+      if (isVerified) {
+        return res.status(200).json({ 
+          success: true, 
+          message: "Email verified successfully" 
+        });
+      } else {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Invalid or expired verification code" 
+        });
+      }
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  // Resend verification email endpoint
+  app.post("/api/resend-verification", async (req, res, next) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const user = req.user;
+      
+      // Don't resend if already verified
+      if (user.emailVerified) {
+        return res.status(400).json({ message: "Email already verified" });
+      }
+      
+      const emailSent = await sendVerificationEmail(user);
+      
+      if (emailSent) {
+        return res.status(200).json({ 
+          success: true, 
+          message: "Verification email sent successfully" 
+        });
+      } else {
+        return res.status(500).json({ 
+          success: false, 
+          message: "Failed to send verification email" 
+        });
+      }
+    } catch (error) {
+      next(error);
+    }
   });
 }

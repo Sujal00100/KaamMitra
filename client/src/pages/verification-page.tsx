@@ -1,8 +1,10 @@
 
 import { VerificationForm } from "@/components/verification/verification-form";
+import { EmailVerificationForm } from "@/components/verification/email-verification-form";
 import { useAuth } from "@/hooks/use-auth";
 import { Redirect } from "wouter";
-import { Loader2, ShieldCheck } from "lucide-react";
+import { Loader2, Mail, ShieldCheck } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function VerificationPage() {
   const { user, isLoading } = useAuth();
@@ -31,7 +33,26 @@ export default function VerificationPage() {
         
         <div className="grid grid-cols-1 gap-8 md:grid-cols-[2fr_1fr]">
           <div>
-            <VerificationForm />
+            <Tabs defaultValue="id" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="id" className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>ID Verification</span>
+                </TabsTrigger>
+                <TabsTrigger value="email" className="flex items-center gap-2">
+                  <Mail className="w-4 h-4" />
+                  <span>Email Verification</span>
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="id" className="mt-4">
+                <VerificationForm />
+              </TabsContent>
+              
+              <TabsContent value="email" className="mt-4">
+                <EmailVerificationForm />
+              </TabsContent>
+            </Tabs>
           </div>
           
           <div className="space-y-6">
@@ -49,6 +70,7 @@ export default function VerificationPage() {
             <div className="p-5 border rounded-lg bg-muted/30">
               <h3 className="text-lg font-semibold">Verification Process</h3>
               <ol className="mt-3 space-y-3 text-sm list-decimal list-inside text-muted-foreground">
+                <li>Verify your email address with the verification code</li>
                 <li>Submit your government ID and information</li>
                 <li>Our team reviews your documentation</li>
                 <li>Verification is typically completed within 24-48 hours</li>
