@@ -381,7 +381,10 @@ export class DatabaseStorage implements IStorage {
           created_at as "createdAt", 
           date_of_birth as "dateOfBirth",
           age, is_verified as "isVerified",
-          verification_status as "verificationStatus"
+          verification_status as "verificationStatus",
+          email_verified as "emailVerified",
+          verification_code as "verificationCode",
+          verification_code_expires as "verificationCodeExpires"
         FROM users
         WHERE id = ${id}
       `);
@@ -407,7 +410,10 @@ export class DatabaseStorage implements IStorage {
           created_at as "createdAt", 
           date_of_birth as "dateOfBirth",
           age, is_verified as "isVerified",
-          verification_status as "verificationStatus"
+          verification_status as "verificationStatus",
+          email_verified as "emailVerified",
+          verification_code as "verificationCode",
+          verification_code_expires as "verificationCodeExpires"
         FROM users
         WHERE username = ${username}
       `);
@@ -480,7 +486,10 @@ export class DatabaseStorage implements IStorage {
           phone, email, user_type as "userType", location, 
           created_at as "createdAt", date_of_birth as "dateOfBirth",
           age, is_verified as "isVerified",
-          verification_status as "verificationStatus"
+          verification_status as "verificationStatus",
+          email_verified as "emailVerified",
+          verification_code as "verificationCode",
+          verification_code_expires as "verificationCodeExpires"
       `);
       
       return result.rows[0];
