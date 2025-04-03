@@ -6,7 +6,7 @@ import { z } from "zod";
 import multer from "multer";
 import fs from "fs";
 import path from "path";
-import migrateEmailFields from "./migrate-email-fields.js";
+import { migrateEmailFields } from "./migrate-email-fields.js";
 import { sendVerificationEmail, verifyEmail } from "./email-service.js";
 
 // Configure multer storage
@@ -27,7 +27,7 @@ const storage_config = multer.diskStorage({
 
 const upload = multer({ storage: storage_config });
 
-export async function registerRoutes(app) {
+async function registerRoutes(app) {
   // Run email verification fields migration
   try {
     await migrateEmailFields();
@@ -465,35 +465,30 @@ export async function registerRoutes(app) {
       // Create verification document
       const document = await storage.createVerificationDocument({
         userId: req.user.id,
-        documentPath: req.file.path,
         documentType: data.govtIdType,
-        govtId: data.govtId,
-        dateOfBirth: data.dateOfBirth,
+        documentNumber: data.govtId,
+        documentImage: req.file.path,
         address: data.address,
+        dateOfBirth: data.dateOfBirth,
+        submittedAt: new Date(),
       });
       
       res.status(201).json({
-        success: true,
-        message: "Verification submitted successfully",
-        document
+        message: "Verification document submitted successfully",
+        verificationStatus: "pending",
+        document: {
+          id: document.id,
+          documentType: document.documentType,
+          submittedAt: document.submittedAt
+        }
       });
     } catch (error) {
       console.error("Verification submission error:", error);
-      
       if (error instanceof z.ZodError) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid verification data",
-          errors: error.errors
-        });
+        return res.status(400).json({ message: "Invalid verification data", errors: error.errors });
       }
-      
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      res.status(500).json({
-        success: false,
-        message: "Failed to submit verification",
-        error: errorMessage
-      });
+      res.status(500).json({ message: "Failed to submit verification", error: errorMessage });
     }
   });
 
@@ -504,19 +499,17 @@ export async function registerRoutes(app) {
         return res.status(401).json({ message: "Not authenticated" });
       }
       
-      const verificationCode = req.body.code;
+      const schema = z.object({
+        code: z.string().min(6).max(6)
+      });
       
-      if (!verificationCode) {
-        return res.status(400).json({
-          success: false,
-          message: "Verification code is required"
-        });
-      }
+      const { code } = schema.parse(req.body);
       
-      const success = await verifyEmail(req.user.id, verificationCode);
+      // Use our email verification function from email-service.js
+      const success = await verifyEmail(req.user.id, code);
       
       if (success) {
-        return res.status(200).json({
+        return res.json({ 
           success: true,
           message: "Email verified successfully"
         });
@@ -528,15 +521,22 @@ export async function registerRoutes(app) {
       }
     } catch (error) {
       console.error("Email verification error:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          success: false,
+          message: "Invalid verification code format", 
+          errors: error.errors 
+        });
+      }
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      return res.status(500).json({
+      return res.status(500).json({ 
         success: false,
-        message: "Failed to verify email",
-        error: errorMessage
+        message: "Failed to verify email", 
+        error: errorMessage 
       });
     }
   });
-
+  
   // POST resend verification email
   app.post("/api/resend-verification", async (req, res) => {
     try {
@@ -544,6 +544,7 @@ export async function registerRoutes(app) {
         return res.status(401).json({ message: "Not authenticated" });
       }
       
+      // Get the user
       const user = await storage.getUser(req.user.id);
       
       if (!user) {
@@ -553,17 +554,19 @@ export async function registerRoutes(app) {
         });
       }
       
-      if (user.email_verified) {
-        return res.status(400).json({
-          success: false,
-          message: "Email is already verified"
+      // Check if the user has already verified their email
+      if (user.emailVerified) {
+        return res.json({
+          success: true,
+          message: "Email already verified"
         });
       }
       
-      const success = await sendVerificationEmail(user);
+      // Send a new verification email
+      const emailSent = await sendVerificationEmail(user);
       
-      if (success) {
-        return res.status(200).json({
+      if (emailSent) {
+        return res.json({
           success: true,
           message: "Verification email sent successfully"
         });
@@ -587,3 +590,5 @@ export async function registerRoutes(app) {
   const httpServer = createServer(app);
   return httpServer;
 }
+
+export { registerRoutes };

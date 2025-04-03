@@ -3,7 +3,7 @@ import { registerRoutes } from "./routes.js";
 import { setupVite, serveStatic, log } from "./vite.js";
 import { seedDatabase } from "./seed.js";
 import { initEmailService } from "./email-service.js";
-import migrateEmailFields from "./migrate-email-fields.js";
+import { migrateEmailFields } from "./migrate-email-fields.js";
 
 const app = express();
 app.use(express.json());

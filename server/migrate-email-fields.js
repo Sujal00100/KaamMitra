@@ -1,6 +1,6 @@
 import { pool } from './db.js';
 
-async function migrateEmailFields() {
+export async function migrateEmailFields() {
   console.log('Starting email verification fields migration...');
   
   const client = await pool.connect();
@@ -76,6 +76,4 @@ async function migrateEmailFields() {
 }
 
 // We won't auto-run this in ESM modules
-// The migration will be called directly from routes.ts
-
-export default migrateEmailFields;
+// The migration will be called directly from routes.js

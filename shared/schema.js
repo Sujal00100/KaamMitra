@@ -1,10 +1,9 @@
 import { pgTable, text, serial, integer, boolean, timestamp, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
-import { relations } from "drizzle-orm";
 
 // User table that can be either a worker or an employer
-export const users = pgTable("users", {
+const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
@@ -29,11 +28,11 @@ export const users = pgTable("users", {
 });
 
 // Worker profiles with skills and ratings
-export const workerProfiles = pgTable("worker_profiles", {
+const workerProfiles = pgTable("worker_profiles", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id),
   primarySkill: text("primary_skill").notNull(),
-  description: text("description").notNull(),
+  description: text("description"),
   isAvailable: boolean("is_available").default(true).notNull(),
   averageRating: integer("average_rating").default(0).notNull(),
   totalRatings: integer("total_ratings").default(0).notNull(),
@@ -41,34 +40,30 @@ export const workerProfiles = pgTable("worker_profiles", {
 });
 
 // Job postings by employers
-export const jobs = pgTable("jobs", {
+const jobs = pgTable("jobs", {
   id: serial("id").primaryKey(),
   employerId: integer("employer_id").notNull().references(() => users.id),
   title: text("title").notNull(),
   description: text("description").notNull(),
   location: text("location").notNull(),
-  budget: integer("budget").notNull(),
   category: text("category").notNull(),
-  duration: text("duration").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+  wage: text("wage").notNull(),
+  duration: text("duration"),
   isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-// Job applications by workers
-export const applications = pgTable("applications", {
+// Job applications from workers to jobs
+const applications = pgTable("applications", {
   id: serial("id").primaryKey(),
   jobId: integer("job_id").notNull().references(() => jobs.id),
   workerId: integer("worker_id").notNull().references(() => users.id),
-  coverLetter: text("cover_letter"),
-  bidAmount: integer("bid_amount").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  status: text("status", { 
-    enum: ["pending", "accepted", "rejected", "completed"] 
-  }).default("pending").notNull(),
+  status: text("status", { enum: ["pending", "accepted", "rejected", "completed"] }).default("pending").notNull(),
+  appliedAt: timestamp("applied_at").defaultNow().notNull(),
 });
 
-// Ratings for workers
-export const ratings = pgTable("ratings", {
+// Ratings given to workers after job completion
+const ratings = pgTable("ratings", {
   id: serial("id").primaryKey(),
   workerId: integer("worker_id").notNull().references(() => users.id),
   employerId: integer("employer_id").notNull().references(() => users.id),
@@ -78,72 +73,72 @@ export const ratings = pgTable("ratings", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-// Verification documents
-export const verificationDocuments = pgTable("verification_documents", {
+// Government ID verification documents
+const verificationDocuments = pgTable("verification_documents", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id),
   documentType: text("document_type", { 
-    enum: ["aadhar_card", "pan_card", "voter_id", "driving_license", "passport"] 
+    enum: ["aadhar_card", "voter_id", "passport", "driving_license", "pan_card", "other"] 
   }).notNull(),
   documentNumber: text("document_number").notNull(),
-  documentImage: text("document_image").notNull(), // File path
-  uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
-  reviewNotes: text("review_notes"),
+  documentImageUrl: text("document_image_url"), // URL or reference to where the document is stored
+  verificationNotes: text("verification_notes"),
+  submittedAt: timestamp("submitted_at").defaultNow().notNull(),
   reviewedAt: timestamp("reviewed_at"),
 });
 
-// Creating schemas for insert operations
-export const insertUserSchema = createInsertSchema(users).omit({
+// Create insert schemas
+const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
-  isVerified: true,
-  verificationStatus: true,
-  emailVerified: true,
-  verificationCode: true,
-  verificationCodeExpires: true,
 });
 
-export const insertWorkerProfileSchema = createInsertSchema(workerProfiles).omit({
+const insertWorkerProfileSchema = createInsertSchema(workerProfiles).omit({
   id: true,
   averageRating: true,
   totalRatings: true,
   verified: true,
 });
 
-export const insertJobSchema = createInsertSchema(jobs).omit({
+const insertJobSchema = createInsertSchema(jobs).omit({
   id: true,
   createdAt: true,
   isActive: true,
 });
 
-export const insertApplicationSchema = createInsertSchema(applications).omit({
-  id: true,
-  createdAt: true,
+const insertApplicationSchema = createInsertSchema(applications).omit({
+  id: true, 
   status: true,
+  appliedAt: true,
 });
 
-export const insertRatingSchema = createInsertSchema(ratings).omit({
+const insertRatingSchema = createInsertSchema(ratings).omit({
   id: true,
   createdAt: true,
 });
 
-export const insertVerificationDocumentSchema = createInsertSchema(verificationDocuments).omit({
+const insertVerificationDocumentSchema = createInsertSchema(verificationDocuments).omit({
   id: true,
-  uploadedAt: true,
-  reviewNotes: true,
+  submittedAt: true,
   reviewedAt: true,
 });
 
-// Export schemas and types
-export const User = users;
-export const WorkerProfile = workerProfiles;
-export const Job = jobs;
-export const Application = applications;
-export const Rating = ratings;
-export const VerificationDocument = verificationDocuments;
-export const InsertUser = insertUserSchema;
-export const InsertWorkerProfile = insertWorkerProfileSchema;
-export const InsertJob = insertJobSchema;
-export const InsertApplication = insertApplicationSchema;
-export const InsertRating = insertRatingSchema;
-export const InsertVerificationDocument = insertVerificationDocumentSchema;
+// Log the schema objects being exported for debugging
+console.log("Debug - insertJobSchema exists:", !!insertJobSchema);
+console.log("Debug - insertJobSchema type:", typeof insertJobSchema);
+
+// Export using ES modules
+export {
+  users,
+  workerProfiles,
+  jobs,
+  applications,
+  ratings,
+  verificationDocuments,
+  insertUserSchema,
+  insertWorkerProfileSchema,
+  insertJobSchema,
+  insertApplicationSchema,
+  insertRatingSchema,
+  insertVerificationDocumentSchema
+};
