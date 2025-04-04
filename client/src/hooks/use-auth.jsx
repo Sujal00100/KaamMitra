@@ -7,8 +7,8 @@ import { getQueryFn, apiRequest, queryClient } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 
-// Import schema directly from JavaScript file since we no longer use TypeScript imports
-const insertUserSchema = require("../../shared/schema").insertUserSchema;
+// Import schema directly from JavaScript file using ES modules
+import { insertUserSchema } from "../../../shared/schema.js";
 
 // Extended schema for registration with confirmPassword field
 export const registerSchema = insertUserSchema.extend({
