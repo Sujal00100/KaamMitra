@@ -921,6 +921,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to mark messages as read", error: errorMessage });
     }
   });
+  
+  // Search users endpoint (used for messaging)
+  app.get("/api/search/users", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const query = req.query.query as string;
+      const userType = req.query.userType as string;
+      
+      if (!query) {
+        return res.status(400).json({ message: "Search query is required" });
+      }
+      
+      // Perform search in the database using Drizzle ORM
+      let conditions = [];
+      
+      // First condition: username or fullName contains the query string
+      conditions.push(
+        or(
+          ilike(users.username, `%${query}%`),
+          ilike(users.fullName, `%${query}%`)
+        )
+      );
+      
+      // Second condition: exclude the current user
+      conditions.push(
+        (users.id != req.user.id)
+      );
+      
+      // Optional third condition: filter by user type if provided
+      if (userType === 'worker' || userType === 'employer') {
+        conditions.push(
+          eq(users.userType, userType)
+        );
+      }
+      
+      // Execute the query
+      const foundUsers = await db
+        .select({
+          id: users.id,
+          username: users.username,
+          fullName: users.fullName,
+          location: users.location,
+          userType: users.userType,
+        })
+        .from(users)
+        .where(and(...conditions))
+        .limit(10);
+      
+      res.json(foundUsers);
+    } catch (error) {
+      console.error("User search error:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({ message: "Failed to search users", error: errorMessage });
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;

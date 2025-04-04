@@ -30,9 +30,17 @@ export function ConversationView({ conversationId, onBack }: ConversationViewPro
   const [isSending, setIsSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  interface MessageType {
+    id: number;
+    content: string;
+    senderId: number;
+    sentAt: string;
+    readAt: string | null;
+  }
+
   // Function to format messages by date
-  const groupMessagesByDate = (messages: any[] = []) => {
-    const groups: Record<string, any[]> = {};
+  const groupMessagesByDate = (messages: MessageType[] = []) => {
+    const groups: Record<string, MessageType[]> = {};
     
     messages.forEach(message => {
       const date = new Date(message.sentAt);
@@ -62,11 +70,12 @@ export function ConversationView({ conversationId, onBack }: ConversationViewPro
   // Mark messages as read when viewing
   useEffect(() => {
     const unreadMessages = conversationDetails?.messages?.filter(
-      message => message.senderId !== user?.id && !message.readAt
+      (message: { senderId: number; readAt: string | null; id: number }) => 
+        message.senderId !== user?.id && !message.readAt
     );
     
     if (unreadMessages && unreadMessages.length > 0) {
-      unreadMessages.forEach(message => {
+      unreadMessages.forEach((message: { id: number }) => {
         markMessageAsRead.mutate({ messageId: message.id });
       });
     }

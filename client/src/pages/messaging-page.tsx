@@ -21,7 +21,7 @@ import { useLocation } from 'wouter';
 
 export default function MessagingPage() {
   const { user } = useAuth();
-  const { conversations, isLoadingConversations, error, refetchConversations } = useMessaging();
+  const { conversations, isLoadingConversations, conversationsError, refetchConversations } = useMessaging();
   const [selectedConversation, setSelectedConversation] = useState<number | null>(null);
   const [location] = useLocation();
   const [newConversationOpen, setNewConversationOpen] = useState(false);
@@ -84,11 +84,11 @@ export default function MessagingPage() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          {error ? (
+          {conversationsError ? (
             <Alert variant="destructive" className="m-4">
               <AlertTitle>Error</AlertTitle>
               <AlertDescription>
-                {error instanceof Error ? error.message : 'Failed to load messages'}
+                {conversationsError instanceof Error ? conversationsError.message : 'Failed to load messages'}
               </AlertDescription>
             </Alert>
           ) : currentConversationId ? (
