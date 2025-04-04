@@ -8,7 +8,7 @@ export function Footer() {
           <div>
             <div className="flex items-center mb-4">
               <span className="material-icons text-3xl mr-2">handyman</span>
-              <h2 className="text-xl font-bold">KaamMitra</h2>
+              <h2 className="text-xl font-bold">WorkBuddy</h2>
             </div>
             <p className="text-neutral-300 mb-4">Connecting daily wage workers with local job opportunities.</p>
             <div className="flex space-x-4">
@@ -66,7 +66,7 @@ export function Footer() {
         </div>
         
         <div className="border-t border-neutral-700 mt-8 pt-8 text-center text-neutral-400">
-          <p>&copy; {new Date().getFullYear()} KaamMitra. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} WorkBuddy. All rights reserved.</p>
         </div>
       </div>
     </footer>

@@ -20,9 +20,10 @@ type AuthContextType = {
 
 type LoginData = Pick<InsertUser, "username" | "password">;
 
-// Extended schema for registration with confirmPassword field
+// Extended schema for registration with confirmPassword field and primarySkill for workers
 export const registerSchema = insertUserSchema.extend({
   confirmPassword: z.string(),
+  primarySkill: z.string().optional(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords do not match",
   path: ["confirmPassword"],
@@ -75,7 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       queryClient.setQueryData(["/api/user"], user);
       toast({
         title: "Registration successful",
-        description: `Welcome to KaamMitra, ${user.fullName}!`,
+        description: `Welcome to WorkBuddy, ${user.fullName}!`,
       });
     },
     onError: (error: Error) => {

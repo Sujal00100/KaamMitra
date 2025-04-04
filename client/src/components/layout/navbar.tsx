@@ -40,7 +40,7 @@ export function Navbar() {
         <Link href="/">
           <div className="flex items-center cursor-pointer">
             <span className="material-icons text-primary text-3xl mr-2">handyman</span>
-            <h1 className="text-xl font-bold text-primary">KaamMitra</h1>
+            <h1 className="text-xl font-bold text-primary">WorkBuddy</h1>
           </div>
         </Link>
 
@@ -126,7 +126,7 @@ export function Navbar() {
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center">
                     <span className="material-icons text-primary text-3xl mr-2">handyman</span>
-                    <h1 className="text-xl font-bold text-primary">KaamMitra</h1>
+                    <h1 className="text-xl font-bold text-primary">WorkBuddy</h1>
                   </div>
                   <SheetTrigger asChild>
                     <Button
