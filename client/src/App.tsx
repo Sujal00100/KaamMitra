@@ -10,6 +10,7 @@ import RegisterPage from "@/pages/register-page";
 import VerificationPage from "@/pages/verification-page";
 import AdminPage from "@/pages/admin-page";
 import PaymentDemo from "@/pages/payment-demo";
+import MessagingPage from "@/pages/messaging-page";
 import { AuthProvider } from "./hooks/use-auth";
 import { ProtectedRoute } from "./lib/protected-route.jsx";
 import WorkerDashboard from "./pages/dashboard/worker-dashboard";
@@ -30,6 +31,8 @@ function Router() {
       <ProtectedRoute path="/employer-dashboard" component={EmployerDashboard} userType="employer" />
       <ProtectedRoute path="/post-job" component={PostJob} userType="employer" />
       <ProtectedRoute path="/verification" component={VerificationPage} />
+      <ProtectedRoute path="/messaging" component={MessagingPage} />
+      <ProtectedRoute path="/messaging/:id" component={MessagingPage} />
       <Route path="/admin" component={AdminPage} />
       <Route path="/payment" component={PaymentDemo} />
       <Route path="/jobs/:id" component={JobDetails} />

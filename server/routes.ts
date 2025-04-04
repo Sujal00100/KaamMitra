@@ -2,11 +2,21 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
-import { insertJobSchema, insertApplicationSchema, insertRatingSchema, insertVerificationDocumentSchema } from "@shared/schema";
+import { 
+  insertJobSchema, 
+  insertApplicationSchema, 
+  insertRatingSchema, 
+  insertVerificationDocumentSchema,
+  insertConversationSchema,
+  insertMessageSchema
+} from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
 import fs from "fs";
 import path from "path";
+import { eq, like, ilike, and, or } from "drizzle-orm";
+import { db } from "./db";
+import { users } from "@shared/schema"; 
 import migrateEmailFields from "./migrate-email-fields";
 import { sendVerificationEmail, verifyEmail } from "./email-service";
 import { getChatbotResponse, getJobRecommendations, getHiringTips } from "./services/openai-service";
@@ -740,6 +750,175 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: "Failed to get hiring tips",
         error: errorMessage
       });
+    }
+  });
+
+  // Messaging API Routes
+  
+  // GET conversations for current user
+  app.get("/api/conversations", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const conversations = await storage.getConversationsByUser(req.user.id);
+      res.json(conversations);
+    } catch (error) {
+      console.error("Error fetching conversations:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({ message: "Failed to fetch conversations", error: errorMessage });
+    }
+  });
+
+  // GET single conversation with messages
+  app.get("/api/conversations/:id", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const conversationId = parseInt(req.params.id);
+      const conversation = await storage.getConversation(conversationId);
+      
+      if (!conversation) {
+        return res.status(404).json({ message: "Conversation not found" });
+      }
+      
+      // Check if user is a participant in this conversation
+      if (conversation.participant1Id !== req.user.id && conversation.participant2Id !== req.user.id) {
+        return res.status(403).json({ message: "You don't have access to this conversation" });
+      }
+      
+      // Mark messages as read for this user
+      await storage.markMessagesAsRead(conversationId, req.user.id);
+      
+      // Get the other participant
+      const otherParticipantId = conversation.participant1Id === req.user.id 
+        ? conversation.participant2Id 
+        : conversation.participant1Id;
+      
+      const otherParticipant = await storage.getUser(otherParticipantId);
+      
+      // Get messages
+      const messages = await storage.getMessagesByConversation(conversationId);
+      
+      res.json({
+        conversation,
+        otherParticipant,
+        messages
+      });
+    } catch (error) {
+      console.error("Error fetching conversation:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({ message: "Failed to fetch conversation", error: errorMessage });
+    }
+  });
+
+  // POST start new conversation or get existing
+  app.post("/api/conversations", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const { participantId, jobId } = req.body;
+      
+      if (!participantId) {
+        return res.status(400).json({ message: "Participant ID is required" });
+      }
+      
+      const participant = await storage.getUser(participantId);
+      
+      if (!participant) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Check if conversation already exists
+      let conversation = await storage.getConversationByParticipants(req.user.id, participantId);
+      
+      if (!conversation) {
+        // Create new conversation
+        conversation = await storage.createConversation({
+          participant1Id: req.user.id,
+          participant2Id: participantId,
+          jobId: jobId || null
+        });
+      }
+      
+      res.status(201).json(conversation);
+    } catch (error) {
+      console.error("Error creating conversation:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({ message: "Failed to create conversation", error: errorMessage });
+    }
+  });
+
+  // POST send message
+  app.post("/api/conversations/:id/messages", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const conversationId = parseInt(req.params.id);
+      const conversation = await storage.getConversation(conversationId);
+      
+      if (!conversation) {
+        return res.status(404).json({ message: "Conversation not found" });
+      }
+      
+      // Check if user is a participant in this conversation
+      if (conversation.participant1Id !== req.user.id && conversation.participant2Id !== req.user.id) {
+        return res.status(403).json({ message: "You don't have access to this conversation" });
+      }
+      
+      const { content } = req.body;
+      
+      if (!content || typeof content !== "string" || content.trim() === "") {
+        return res.status(400).json({ message: "Message content is required" });
+      }
+      
+      const message = await storage.createMessage({
+        conversationId,
+        senderId: req.user.id,
+        content,
+        metadata: {}
+      });
+      
+      res.status(201).json(message);
+    } catch (error) {
+      console.error("Error sending message:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({ message: "Failed to send message", error: errorMessage });
+    }
+  });
+
+  // PATCH mark messages as read
+  app.patch("/api/conversations/:id/read", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const conversationId = parseInt(req.params.id);
+      const conversation = await storage.getConversation(conversationId);
+      
+      if (!conversation) {
+        return res.status(404).json({ message: "Conversation not found" });
+      }
+      
+      // Check if user is a participant in this conversation
+      if (conversation.participant1Id !== req.user.id && conversation.participant2Id !== req.user.id) {
+        return res.status(403).json({ message: "You don't have access to this conversation" });
+      }
+      
+      await storage.markMessagesAsRead(conversationId, req.user.id);
+      res.status(200).json({ message: "Messages marked as read" });
+    } catch (error) {
+      console.error("Error marking messages as read:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({ message: "Failed to mark messages as read", error: errorMessage });
     }
   });
 
