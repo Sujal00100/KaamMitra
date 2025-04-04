@@ -102,10 +102,10 @@ export function Navbar() {
             </>
           ) : (
             <>
-              <Link href="/auth?tab=login" className="hidden md:inline-block">
+              <Link href="/login" className="hidden md:inline-block">
                 <Button variant="outline">Login</Button>
               </Link>
-              <Link href="/auth?tab=register">
+              <Link href="/register">
                 <Button>Register</Button>
               </Link>
             </>
@@ -190,13 +190,13 @@ export function Navbar() {
                   ) : (
                     <>
                       <Link
-                        href="/auth?tab=login"
+                        href="/login"
                         className="block py-2 text-neutral-700 hover:text-primary"
                         onClick={() => setMobileMenuOpen(false)}
                       >
                         Login
                       </Link>
-                      <Link href="/auth?tab=register" onClick={() => setMobileMenuOpen(false)}>
+                      <Link href="/register" onClick={() => setMobileMenuOpen(false)}>
                         <Button className="w-full mt-4">Register</Button>
                       </Link>
                     </>

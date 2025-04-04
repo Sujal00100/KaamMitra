@@ -8,6 +8,7 @@ import fs from "fs";
 import path from "path";
 import { migrateEmailFields } from "./migrate-email-fields.js";
 import { sendVerificationEmail, verifyEmail } from "./email-service.js";
+import { getChatbotResponse, getJobRecommendations, getHiringTips } from "./services/openai-service.js";
 
 // Configure multer storage
 const storage_config = multer.diskStorage({
@@ -584,6 +585,100 @@ async function registerRoutes(app) {
         message: "Failed to resend verification email",
         error: errorMessage
       });
+    }
+  });
+
+  // AI Chatbot routes
+  
+  // POST chatbot conversation
+  app.post("/api/chatbot/message", async (req, res) => {
+    try {
+      const messageSchema = z.object({
+        message: z.string().min(1, "Message is required")
+      });
+      
+      // Validate the incoming data
+      const { message } = messageSchema.parse(req.body);
+      
+      // Get response from OpenAI
+      const response = await getChatbotResponse(message);
+      
+      res.json({ response });
+    } catch (error) {
+      console.error("ChatBot API error:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid message data", errors: error.errors });
+      }
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({ message: "Failed to get chatbot response", error: errorMessage });
+    }
+  });
+  
+  // POST job recommendations for worker
+  app.post("/api/chatbot/job-recommendations", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      if (req.user.userType !== "worker") {
+        return res.status(403).json({ message: "Only workers can get job recommendations" });
+      }
+      
+      const recommendationSchema = z.object({
+        primarySkill: z.string(),
+        location: z.string(),
+        preferredJobTypes: z.array(z.string()).optional()
+      });
+      
+      // Validate the incoming data
+      const workerProfile = recommendationSchema.parse(req.body);
+      
+      // Get recommendations from OpenAI
+      const recommendations = await getJobRecommendations(workerProfile);
+      
+      res.json({ recommendations });
+    } catch (error) {
+      console.error("Job recommendations API error:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid profile data", errors: error.errors });
+      }
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({ message: "Failed to get job recommendations", error: errorMessage });
+    }
+  });
+  
+  // POST hiring tips for employer
+  app.post("/api/chatbot/hiring-tips", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      if (req.user.userType !== "employer") {
+        return res.status(403).json({ message: "Only employers can get hiring tips" });
+      }
+      
+      const jobSchema = z.object({
+        jobTitle: z.string(),
+        requiredSkills: z.array(z.string()),
+        location: z.string()
+      });
+      
+      // Validate the incoming data
+      const jobDetails = jobSchema.parse(req.body);
+      
+      // Get hiring tips from OpenAI
+      const tips = await getHiringTips(jobDetails);
+      
+      res.json({ tips });
+    } catch (error) {
+      console.error("Hiring tips API error:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid job details", errors: error.errors });
+      }
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({ message: "Failed to get hiring tips", error: errorMessage });
     }
   });
 
