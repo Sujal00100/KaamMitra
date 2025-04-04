@@ -13,6 +13,7 @@ import PaymentDemo from "@/pages/payment-demo";
 import MessagingPage from "@/pages/messaging-page";
 import { AuthProvider } from "./hooks/use-auth";
 import { ProtectedRoute } from "./lib/protected-route";
+import { ComponentType, ReactElement } from "react";
 import WorkerDashboard from "./pages/dashboard/worker-dashboard";
 import EmployerDashboard from "./pages/dashboard/employer-dashboard";
 import JobDetails from "./pages/jobs/job-details";
@@ -33,11 +34,11 @@ function Router() {
       <ProtectedRoute path="/verification" component={VerificationPage} />
       <ProtectedRoute path="/messaging" component={MessagingPage} />
       <ProtectedRoute path="/messaging/:id" component={MessagingPage} />
-      <Route path="/admin" component={AdminPage} />
-      <Route path="/payment" component={PaymentDemo} />
+      <ProtectedRoute path="/admin-dashboard" component={AdminPage} />
+      <Route path="/payment-demo" component={PaymentDemo} />
       <Route path="/jobs/:id" component={JobDetails} />
       <Route path="/workers/:id" component={WorkerProfile} />
-      <Route component={NotFound} />
+      <Route path="/:rest*" component={NotFound} />
     </Switch>
   );
 }

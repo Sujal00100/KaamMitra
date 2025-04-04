@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, CheckCircle, AlertCircle } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
 
 interface UpiPaymentProps {
   amount: number;
@@ -45,16 +46,18 @@ export function UpiPayment({ amount, description, recipientId = "", onSuccess, o
     setStatus("processing");
 
     try {
-      // In a real application, make an actual API call to process payment
-      // const response = await apiRequest("POST", "/api/payment/process", {
-      //   amount,
-      //   upiId,
-      //   recipientId,
-      //   description
-      // });
+      // Make an actual API call to process payment
+      const response = await apiRequest("POST", "/api/payment/process", {
+        amount,
+        upiId,
+        recipientId,
+        description
+      });
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to process payment");
+      }
       
       // Success case
       setStatus("success");

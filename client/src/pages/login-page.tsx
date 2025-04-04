@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -38,13 +38,15 @@ export default function LoginPage() {
   const { user, loginMutation } = useAuth();
   
   // If user is already logged in, redirect to appropriate dashboard
-  if (user) {
-    if (user.userType === "worker") {
-      setLocation("/worker-dashboard");
-    } else {
-      setLocation("/employer-dashboard");
+  useEffect(() => {
+    if (user) {
+      if (user.userType === "worker") {
+        setLocation("/worker-dashboard");
+      } else {
+        setLocation("/employer-dashboard");
+      }
     }
-  }
+  }, [user, setLocation]);
   
   // Login form setup
   const loginForm = useForm<LoginFormValues>({

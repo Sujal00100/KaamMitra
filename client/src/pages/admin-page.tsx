@@ -65,11 +65,13 @@ export default function AdminPage() {
 
     setIsSavingUpi(true);
     try {
-      // This would normally save to a database, but for now just show a success message
-      // await apiRequest("POST", "/api/payment/upi", { upiId });
+      // Make a real API call to save the UPI ID
+      const response = await apiRequest("POST", "/api/payment/upi", { upiId });
       
-      // Simulating a successful API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to save UPI ID");
+      }
       
       toast({
         title: "Success",

@@ -44,13 +44,15 @@ export default function RegisterPage() {
   const { user, registerMutation } = useAuth();
   
   // If user is already logged in, redirect to appropriate dashboard
-  if (user) {
-    if (user.userType === "worker") {
-      setLocation("/worker-dashboard");
-    } else {
-      setLocation("/employer-dashboard");
+  useEffect(() => {
+    if (user) {
+      if (user.userType === "worker") {
+        setLocation("/worker-dashboard");
+      } else {
+        setLocation("/employer-dashboard");
+      }
     }
-  }
+  }, [user, setLocation]);
   
   // Register form setup
   const registerForm = useForm<z.infer<typeof registerSchema>>({

@@ -62,7 +62,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // POST set UPI payment info
+  // POST set UPI payment info (admin use)
   app.post("/api/payment/upi", async (req, res) => {
     try {
       if (!req.isAuthenticated()) {
@@ -89,6 +89,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error saving UPI payment info:", error);
       res.status(500).json({ message: "Failed to save UPI payment information" });
+    }
+  });
+  
+  // POST process UPI payment
+  app.post("/api/payment/process", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const { amount, upiId, recipientId, description } = req.body;
+      
+      // Validate inputs
+      if (!amount || typeof amount !== "number" || amount <= 0) {
+        return res.status(400).json({ message: "Valid amount is required" });
+      }
+      
+      if (!upiId || typeof upiId !== "string") {
+        return res.status(400).json({ message: "Valid UPI ID is required" });
+      }
+      
+      if (!description || typeof description !== "string") {
+        return res.status(400).json({ message: "Description is required" });
+      }
+      
+      // In a real application, you would process the payment and store the transaction
+      // For now, simulate a successful payment
+      
+      // Create payment record
+      const paymentRecord = {
+        id: Date.now(),
+        userId: req.user.id,
+        amount,
+        upiId,
+        recipientId: recipientId || null,
+        description,
+        status: "completed",
+        createdAt: new Date().toISOString()
+      };
+      
+      // Return success
+      res.json({ 
+        message: "Payment processed successfully",
+        transaction: paymentRecord
+      });
+    } catch (error) {
+      console.error("Error processing payment:", error);
+      res.status(500).json({ message: "Failed to process payment" });
     }
   });
 
