@@ -22,6 +22,7 @@ export interface IStorage {
   updateUserVerification(id: number, verificationStatus: "not_submitted" | "pending" | "verified" | "rejected"): Promise<User | undefined>;
   updateUserVerificationCode(userId: number, code: string, expires: Date): Promise<User | undefined>;
   updateUserEmailVerification(userId: number, verified: boolean): Promise<User | undefined>;
+  deleteAllUsers(): Promise<void>;
   
   // Worker profile operations
   getWorkerProfile(userId: number): Promise<WorkerProfile | undefined>;
@@ -142,6 +143,20 @@ export class MemStorage implements IStorage {
     const updatedUser = { ...user, emailVerified: verified };
     this.users.set(userId, updatedUser);
     return updatedUser;
+  }
+  
+  async deleteAllUsers(): Promise<void> {
+    this.users.clear();
+    this.workerProfiles.clear();
+    this.jobs.clear();
+    this.applications.clear();
+    this.ratings.clear();
+    this.userIdCounter = 1;
+    this.profileIdCounter = 1;
+    this.jobIdCounter = 1;
+    this.applicationIdCounter = 1;
+    this.ratingIdCounter = 1;
+    console.log("All user data has been deleted from in-memory storage");
   }
 
   // Worker profile operations
@@ -812,6 +827,25 @@ export class DatabaseStorage implements IStorage {
       return result[0];
     } catch (error) {
       console.error("Error in updateUserEmailVerification:", error);
+      throw error;
+    }
+  }
+  
+  async deleteAllUsers(): Promise<void> {
+    try {
+      // Delete related records in other tables first (handle foreign key constraints)
+      await db.delete(ratings);
+      await db.delete(applications);
+      await db.delete(jobs);
+      await db.delete(verificationDocuments);
+      await db.delete(workerProfiles);
+      
+      // Finally delete users
+      await db.delete(users);
+      
+      console.log("All user data successfully deleted from database");
+    } catch (error) {
+      console.error("Error in deleteAllUsers:", error);
       throw error;
     }
   }

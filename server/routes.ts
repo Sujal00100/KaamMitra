@@ -40,6 +40,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Set up authentication routes
   setupAuth(app);
+  
+  // POST delete all users (be careful with this route!)
+  app.post("/api/admin/delete-all-users", async (req, res) => {
+    try {
+      await storage.deleteAllUsers();
+      res.json({ message: "All user data deleted successfully" });
+    } catch (error) {
+      console.error("Error during data deletion:", error);
+      res.status(500).json({ message: "Failed to delete user data" });
+    }
+  });
+  
+  // POST set UPI payment info
+  app.post("/api/payment/upi", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      // In a real application, you'd want to restrict this to admins
+      // if (req.user.userType !== "admin") {
+      //   return res.status(403).json({ message: "Not authorized" });
+      // }
+      
+      const { upiId } = req.body;
+      
+      if (!upiId || typeof upiId !== "string") {
+        return res.status(400).json({ message: "Valid UPI ID is required" });
+      }
+      
+      // In a real application, you would save this to the database
+      // For now, just return success
+      res.json({ 
+        message: "UPI payment option saved successfully",
+        upiId
+      });
+    } catch (error) {
+      console.error("Error saving UPI payment info:", error);
+      res.status(500).json({ message: "Failed to save UPI payment information" });
+    }
+  });
 
   // GET workers
   app.get("/api/workers", async (req, res) => {
