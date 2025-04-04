@@ -15,6 +15,7 @@ import EmployerDashboard from "./pages/dashboard/employer-dashboard";
 import JobDetails from "./pages/jobs/job-details";
 import PostJob from "./pages/jobs/post-job";
 import WorkerProfile from "./pages/workers/worker-profile";
+import { Chatbot } from "@/components/ui/chatbot";
 
 function Router() {
   return (
@@ -39,6 +40,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <Router />
+        <Chatbot />
         <Toaster />
       </AuthProvider>
     </QueryClientProvider>

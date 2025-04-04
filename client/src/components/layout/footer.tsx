@@ -47,19 +47,23 @@ export function Footer() {
           </div>
           
           <div>
-            <h3 className="text-lg font-semibold mb-4">Contact Us</h3>
+            <h3 className="text-lg font-semibold mb-4">Support</h3>
             <ul className="space-y-2 text-neutral-300">
               <li className="flex items-start">
                 <span className="material-icons mr-2 text-neutral-400">email</span>
-                <span>support@kaammitra.in</span>
+                <span>support@workbuddy.com</span>
               </li>
               <li className="flex items-start">
-                <span className="material-icons mr-2 text-neutral-400">phone</span>
-                <span>+91 9876543210</span>
+                <span className="material-icons mr-2 text-neutral-400">help_outline</span>
+                <span>Help Center</span>
               </li>
               <li className="flex items-start">
-                <span className="material-icons mr-2 text-neutral-400">location_on</span>
-                <span>123 Tech Park, Bangalore, India</span>
+                <span className="material-icons mr-2 text-neutral-400">chat</span>
+                <span>Live Chat Support</span>
+              </li>
+              <li className="flex items-start">
+                <span className="material-icons mr-2 text-neutral-400">security</span>
+                <span>Privacy Policy</span>
               </li>
             </ul>
           </div>

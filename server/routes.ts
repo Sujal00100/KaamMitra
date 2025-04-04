@@ -9,6 +9,7 @@ import fs from "fs";
 import path from "path";
 import migrateEmailFields from "./migrate-email-fields";
 import { sendVerificationEmail, verifyEmail } from "./email-service";
+import { getChatbotResponse, getJobRecommendations, getHiringTips } from "./services/openai-service";
 
 // Configure multer storage
 const storage_config = multer.diskStorage({
@@ -585,6 +586,117 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(500).json({
         success: false,
         message: "Failed to resend verification email",
+        error: errorMessage
+      });
+    }
+  });
+
+  // Chatbot API endpoint
+  app.post("/api/chatbot/message", async (req, res) => {
+    try {
+      const { message } = req.body;
+      
+      if (!message || typeof message !== 'string') {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Message is required and must be a string" 
+        });
+      }
+      
+      const response = await getChatbotResponse(message);
+      
+      return res.json({
+        success: true,
+        response
+      });
+    } catch (error) {
+      console.error("Chatbot error:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      return res.status(500).json({
+        success: false,
+        message: "Failed to process chatbot message",
+        error: errorMessage
+      });
+    }
+  });
+  
+  // Job recommendations API endpoint
+  app.post("/api/chatbot/job-recommendations", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      if (req.user.userType !== "worker") {
+        return res.status(403).json({ message: "Only workers can get job recommendations" });
+      }
+      
+      const { primarySkill, location, preferredJobTypes } = req.body;
+      
+      if (!primarySkill || !location) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Primary skill and location are required" 
+        });
+      }
+      
+      const recommendations = await getJobRecommendations({
+        primarySkill,
+        location,
+        preferredJobTypes
+      });
+      
+      return res.json({
+        success: true,
+        recommendations
+      });
+    } catch (error) {
+      console.error("Job recommendations error:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      return res.status(500).json({
+        success: false,
+        message: "Failed to get job recommendations",
+        error: errorMessage
+      });
+    }
+  });
+  
+  // Hiring tips API endpoint
+  app.post("/api/chatbot/hiring-tips", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      if (req.user.userType !== "employer") {
+        return res.status(403).json({ message: "Only employers can get hiring tips" });
+      }
+      
+      const { jobTitle, requiredSkills, location } = req.body;
+      
+      if (!jobTitle || !requiredSkills || !location) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Job title, required skills, and location are required" 
+        });
+      }
+      
+      const tips = await getHiringTips({
+        jobTitle,
+        requiredSkills,
+        location
+      });
+      
+      return res.json({
+        success: true,
+        tips
+      });
+    } catch (error) {
+      console.error("Hiring tips error:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      return res.status(500).json({
+        success: false,
+        message: "Failed to get hiring tips",
         error: errorMessage
       });
     }

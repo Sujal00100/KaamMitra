@@ -95,12 +95,57 @@ export default {
             opacity: "0.7",
           },
         },
+        "float": {
+          "0%, 100%": {
+            transform: "translateY(0)",
+          },
+          "50%": {
+            transform: "translateY(-10px)",
+          },
+        },
+        "float-delay": {
+          "0%, 100%": {
+            transform: "translateY(-5px)",
+          },
+          "50%": {
+            transform: "translateY(5px)",
+          },
+        },
+        "bounce-slow": {
+          "0%, 100%": {
+            transform: "translateY(-5%)",
+            animationTimingFunction: "cubic-bezier(0.8, 0, 1, 1)",
+          },
+          "50%": {
+            transform: "translateY(0)",
+            animationTimingFunction: "cubic-bezier(0, 0, 0.2, 1)",
+          },
+        },
+        "rotate-6": {
+          "0%": {
+            transform: "rotate(-3deg)",
+          },
+          "100%": {
+            transform: "rotate(3deg)",
+          },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "fadeIn": "fade-in 1s ease-in-out",
         "pulse-subtle": "pulse-subtle 3s ease-in-out infinite",
+        "pulse-slow": "pulse-subtle 5s ease-in-out infinite",
+        "float": "float 6s ease-in-out infinite",
+        "float-delay": "float-delay 5s ease-in-out infinite",
+        "bounce-slow": "bounce-slow 4s ease-in-out infinite",
+        "rotate-6": "rotate-6 2s ease-in-out alternate infinite",
+      },
+      backgroundImage: {
+        'grid-pattern': 'linear-gradient(to right, rgba(255, 255, 255, 0.1) 1px, transparent 1px), linear-gradient(to bottom, rgba(255, 255, 255, 0.1) 1px, transparent 1px)',
+      },
+      backgroundSize: {
+        'grid-size': '40px 40px',
       },
     },
   },
