@@ -2,8 +2,6 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { seedDatabase } from "./seed";
-import { initEmailService } from "./email-service";
-import migrateEmailFields from "./migrate-email-fields";
 
 const app = express();
 app.use(express.json());
@@ -39,20 +37,13 @@ app.use((req, res, next) => {
   next();
 });
 
-(async () => {
+// Modern ESM entry point
+if (import.meta.url.startsWith('file:')) {
   try {
     // Seed the database with initial data
     await seedDatabase();
-    
-    // Make sure email fields are migrated
-    await migrateEmailFields();
-    console.log("Email verification fields migration completed successfully");
-    
-    // Initialize the email service
-    await initEmailService();
-    console.log("Email service initialized successfully");
   } catch (error) {
-    console.error("Failed to initialize:", error);
+    console.error("Failed to seed database:", error);
   }
 
   const server = await registerRoutes(app);
@@ -78,11 +69,7 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = 5000;
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
+  server.listen(port, '0.0.0.0', () => {
     log(`serving on port ${port}`);
   });
-})();
+}
