@@ -8,7 +8,7 @@ import {
   insertUserSchema, 
   insertWorkerProfileSchema,
   insertJobSchema
-} from "@shared/schema";
+} from "../shared/schema";
 
 const scryptAsync = promisify(scrypt);
 
