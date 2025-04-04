@@ -79,6 +79,7 @@ export default function RegisterPage() {
   }, [userType, registerForm]);
   
   const handleRegister = (data: z.infer<typeof registerSchema>) => {
+    console.log("Form submitted with data:", data);
     registerMutation.mutate(data);
   };
   
@@ -176,9 +177,9 @@ export default function RegisterPage() {
                       name="email"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Email (Optional)</FormLabel>
+                          <FormLabel>Email</FormLabel>
                           <FormControl>
-                            <Input placeholder="Enter your email" {...field} />
+                            <Input placeholder="Enter your email" {...field} required />
                           </FormControl>
                           <FormMessage />
                         </FormItem>

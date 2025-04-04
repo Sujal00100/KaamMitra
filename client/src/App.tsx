@@ -12,7 +12,7 @@ import AdminPage from "@/pages/admin-page";
 import PaymentDemo from "@/pages/payment-demo";
 import MessagingPage from "@/pages/messaging-page";
 import { AuthProvider } from "./hooks/use-auth";
-import { ProtectedRoute } from "./lib/protected-route.jsx";
+import { ProtectedRoute } from "./lib/protected-route";
 import WorkerDashboard from "./pages/dashboard/worker-dashboard";
 import EmployerDashboard from "./pages/dashboard/employer-dashboard";
 import JobDetails from "./pages/jobs/job-details";
