@@ -40,7 +40,7 @@ export function Navbar() {
         <Link href="/">
           <div className="flex items-center cursor-pointer">
             <span className="material-icons text-primary text-3xl mr-2">handyman</span>
-            <h1 className="text-xl font-bold text-primary">KaamMitra</h1>
+            <h1 className="text-xl font-bold text-primary">WorkBuddy</h1>
           </div>
         </Link>
 
@@ -102,10 +102,10 @@ export function Navbar() {
             </>
           ) : (
             <>
-              <Link href="/auth?tab=login" className="hidden md:inline-block">
+              <Link href="/login" className="hidden md:inline-block">
                 <Button variant="outline">Login</Button>
               </Link>
-              <Link href="/auth?tab=register">
+              <Link href="/register">
                 <Button>Register</Button>
               </Link>
             </>
@@ -126,7 +126,7 @@ export function Navbar() {
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center">
                     <span className="material-icons text-primary text-3xl mr-2">handyman</span>
-                    <h1 className="text-xl font-bold text-primary">KaamMitra</h1>
+                    <h1 className="text-xl font-bold text-primary">WorkBuddy</h1>
                   </div>
                   <SheetTrigger asChild>
                     <Button
@@ -190,13 +190,13 @@ export function Navbar() {
                   ) : (
                     <>
                       <Link
-                        href="/auth?tab=login"
+                        href="/login"
                         className="block py-2 text-neutral-700 hover:text-primary"
                         onClick={() => setMobileMenuOpen(false)}
                       >
                         Login
                       </Link>
-                      <Link href="/auth?tab=register" onClick={() => setMobileMenuOpen(false)}>
+                      <Link href="/register" onClick={() => setMobileMenuOpen(false)}>
                         <Button className="w-full mt-4">Register</Button>
                       </Link>
                     </>

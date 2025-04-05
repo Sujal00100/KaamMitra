@@ -1,7 +1,10 @@
+import 'dotenv/config';
+
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { seedDatabase } from "./seed";
+// At the top of server/index.ts
 
 const app = express();
 app.use(express.json());

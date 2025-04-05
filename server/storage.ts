@@ -4,9 +4,11 @@ import { jobs, type Job, type InsertJob } from "@shared/schema";
 import { applications, type Application, type InsertApplication } from "@shared/schema";
 import { ratings, type Rating, type InsertRating } from "@shared/schema";
 import { verificationDocuments, type VerificationDocument, type InsertVerificationDocument } from "@shared/schema";
+import { conversations, type Conversation, type InsertConversation } from "@shared/schema";
+import { messages, type Message, type InsertMessage } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
-import { eq, desc, and, like, sql } from "drizzle-orm";
+import { eq, desc, and, like, sql, or, not, isNull } from "drizzle-orm";
 import connectPgSimple from "connect-pg-simple";
 import { db, pool } from "./db";
 
@@ -22,6 +24,7 @@ export interface IStorage {
   updateUserVerification(id: number, verificationStatus: "not_submitted" | "pending" | "verified" | "rejected"): Promise<User | undefined>;
   updateUserVerificationCode(userId: number, code: string, expires: Date): Promise<User | undefined>;
   updateUserEmailVerification(userId: number, verified: boolean): Promise<User | undefined>;
+  deleteAllUsers(): Promise<void>;
   
   // Worker profile operations
   getWorkerProfile(userId: number): Promise<WorkerProfile | undefined>;
@@ -52,6 +55,19 @@ export interface IStorage {
   getVerificationDocuments(userId: number): Promise<VerificationDocument[]>;
   createVerificationDocument(document: InsertVerificationDocument): Promise<VerificationDocument>;
   updateVerificationDocument(id: number, reviewNotes?: string, reviewedAt?: Date): Promise<VerificationDocument | undefined>;
+  
+  // Messaging operations
+  getConversation(id: number): Promise<Conversation | undefined>;
+  getConversationByParticipants(participant1Id: number, participant2Id: number): Promise<Conversation | undefined>;
+  getConversationsByUser(userId: number): Promise<(Conversation & { otherParticipant: User, lastMessage?: Message })[]>;
+  createConversation(conversation: InsertConversation): Promise<Conversation>;
+  updateConversationLastMessage(id: number, lastMessageAt?: Date): Promise<Conversation | undefined>;
+  
+  // Message operations
+  getMessage(id: number): Promise<Message | undefined>;
+  getMessagesByConversation(conversationId: number): Promise<Message[]>;
+  createMessage(message: InsertMessage): Promise<Message>;
+  markMessagesAsRead(conversationId: number, userId: number): Promise<void>;
   
   // Session store for authentication
   sessionStore: any;
@@ -142,6 +158,20 @@ export class MemStorage implements IStorage {
     const updatedUser = { ...user, emailVerified: verified };
     this.users.set(userId, updatedUser);
     return updatedUser;
+  }
+  
+  async deleteAllUsers(): Promise<void> {
+    this.users.clear();
+    this.workerProfiles.clear();
+    this.jobs.clear();
+    this.applications.clear();
+    this.ratings.clear();
+    this.userIdCounter = 1;
+    this.profileIdCounter = 1;
+    this.jobIdCounter = 1;
+    this.applicationIdCounter = 1;
+    this.ratingIdCounter = 1;
+    console.log("All user data has been deleted from in-memory storage");
   }
 
   // Worker profile operations
@@ -357,6 +387,119 @@ export class MemStorage implements IStorage {
     // In-memory implementation would need to store verification documents
     // This is just a placeholder implementation
     return undefined;
+  }
+
+  // Messaging operations - Conversations
+  private conversations: Map<number, Conversation> = new Map();
+  private messages: Map<number, Message> = new Map();
+  private conversationIdCounter: number = 1;
+  private messageIdCounter: number = 1;
+
+  async getConversation(id: number): Promise<Conversation | undefined> {
+    return this.conversations.get(id);
+  }
+
+  async getConversationByParticipants(participant1Id: number, participant2Id: number): Promise<Conversation | undefined> {
+    // Find a conversation where these two users are participants, regardless of order
+    return Array.from(this.conversations.values()).find(
+      (conv) => 
+        (conv.participant1Id === participant1Id && conv.participant2Id === participant2Id) || 
+        (conv.participant1Id === participant2Id && conv.participant2Id === participant1Id)
+    );
+  }
+
+  async getConversationsByUser(userId: number): Promise<(Conversation & { otherParticipant: User, lastMessage?: Message })[]> {
+    // Find all conversations where this user is a participant
+    const userConversations = Array.from(this.conversations.values())
+      .filter((conv) => conv.participant1Id === userId || conv.participant2Id === userId)
+      .sort((a, b) => b.lastMessageAt.getTime() - a.lastMessageAt.getTime());
+    
+    // Fetch other participant and optional last message for each conversation
+    return Promise.all(userConversations.map(async (conv) => {
+      const otherParticipantId = conv.participant1Id === userId ? conv.participant2Id : conv.participant1Id;
+      const otherParticipant = await this.getUser(otherParticipantId);
+      
+      // Get last message
+      const messages = Array.from(this.messages.values())
+        .filter(msg => msg.conversationId === conv.id)
+        .sort((a, b) => b.sentAt.getTime() - a.sentAt.getTime());
+      
+      const lastMessage = messages.length > 0 ? messages[0] : undefined;
+      
+      return { 
+        ...conv, 
+        otherParticipant: otherParticipant!, 
+        lastMessage 
+      };
+    }));
+  }
+
+  async createConversation(conversation: InsertConversation): Promise<Conversation> {
+    const id = this.conversationIdCounter++;
+    const now = new Date();
+    const newConversation: Conversation = { 
+      ...conversation, 
+      id, 
+      lastMessageAt: now, 
+      createdAt: now 
+    };
+    this.conversations.set(id, newConversation);
+    return newConversation;
+  }
+
+  async updateConversationLastMessage(id: number, lastMessageAt: Date = new Date()): Promise<Conversation | undefined> {
+    const conversation = this.conversations.get(id);
+    if (!conversation) return undefined;
+    
+    const updatedConversation = { ...conversation, lastMessageAt };
+    this.conversations.set(id, updatedConversation);
+    return updatedConversation;
+  }
+
+  // Message operations
+  async getMessage(id: number): Promise<Message | undefined> {
+    return this.messages.get(id);
+  }
+
+  async getMessagesByConversation(conversationId: number): Promise<Message[]> {
+    return Array.from(this.messages.values())
+      .filter(msg => msg.conversationId === conversationId)
+      .sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime()); // Sort from oldest to newest
+  }
+
+  async createMessage(message: InsertMessage): Promise<Message> {
+    const id = this.messageIdCounter++;
+    const sentAt = new Date();
+    const newMessage: Message = { 
+      ...message, 
+      id, 
+      sentAt, 
+      readAt: null 
+    };
+    this.messages.set(id, newMessage);
+    
+    // Update conversation's last message timestamp
+    await this.updateConversationLastMessage(message.conversationId, sentAt);
+    
+    return newMessage;
+  }
+
+  async markMessagesAsRead(conversationId: number, userId: number): Promise<void> {
+    const now = new Date();
+    
+    // Find all unread messages in this conversation sent to this user
+    const messagesToUpdate = Array.from(this.messages.values())
+      .filter(msg => 
+        msg.conversationId === conversationId && 
+        msg.senderId !== userId && // Not sent by this user
+        msg.readAt === null // Not already read
+      );
+      
+    // Mark them as read
+    for (const msg of messagesToUpdate) {
+      const updatedMsg = { ...msg, readAt: now };
+      this.messages.set(msg.id, updatedMsg);
+    }
   }
 }
 
@@ -816,6 +959,25 @@ export class DatabaseStorage implements IStorage {
     }
   }
   
+  async deleteAllUsers(): Promise<void> {
+    try {
+      // Delete related records in other tables first (handle foreign key constraints)
+      await db.delete(ratings);
+      await db.delete(applications);
+      await db.delete(jobs);
+      await db.delete(verificationDocuments);
+      await db.delete(workerProfiles);
+      
+      // Finally delete users
+      await db.delete(users);
+      
+      console.log("All user data successfully deleted from database");
+    } catch (error) {
+      console.error("Error in deleteAllUsers:", error);
+      throw error;
+    }
+  }
+  
   // Get verification documents for a user
   async getVerificationDocuments(userId: number): Promise<VerificationDocument[]> {
     try {
@@ -869,6 +1031,176 @@ export class DatabaseStorage implements IStorage {
       return result[0];
     } catch (error) {
       console.error("Error in updateVerificationDocument:", error);
+      throw error;
+    }
+  }
+
+  // Messaging operations - Conversations
+  async getConversation(id: number): Promise<Conversation | undefined> {
+    try {
+      const result = await db.select().from(conversations).where(eq(conversations.id, id));
+      if (result.length === 0) return undefined;
+      return result[0];
+    } catch (error) {
+      console.error("Error in getConversation:", error);
+      throw error;
+    }
+  }
+
+  async getConversationByParticipants(participant1Id: number, participant2Id: number): Promise<Conversation | undefined> {
+    try {
+      // Find a conversation where these two users are participants, regardless of order
+      const result = await db.select().from(conversations)
+        .where(
+          or(
+            and(
+              eq(conversations.participant1Id, participant1Id),
+              eq(conversations.participant2Id, participant2Id)
+            ),
+            and(
+              eq(conversations.participant1Id, participant2Id),
+              eq(conversations.participant2Id, participant1Id)
+            )
+          )
+        );
+      
+      if (result.length === 0) return undefined;
+      return result[0];
+    } catch (error) {
+      console.error("Error in getConversationByParticipants:", error);
+      throw error;
+    }
+  }
+
+  async getConversationsByUser(userId: number): Promise<(Conversation & { otherParticipant: User, lastMessage?: Message })[]> {
+    try {
+      // Find all conversations where this user is a participant
+      const userConversations = await db.select().from(conversations)
+        .where(
+          or(
+            eq(conversations.participant1Id, userId),
+            eq(conversations.participant2Id, userId)
+          )
+        )
+        .orderBy(desc(conversations.lastMessageAt));
+      
+      // Fetch other participant and optional last message for each conversation
+      return Promise.all(userConversations.map(async (conv) => {
+        const otherParticipantId = conv.participant1Id === userId 
+          ? conv.participant2Id 
+          : conv.participant1Id;
+          
+        const otherParticipant = await this.getUser(otherParticipantId);
+        
+        // Get last message
+        const messagesResult = await db.select().from(messages)
+          .where(eq(messages.conversationId, conv.id))
+          .orderBy(desc(messages.sentAt))
+          .limit(1);
+        
+        const lastMessage = messagesResult.length > 0 ? messagesResult[0] : undefined;
+        
+        return { 
+          ...conv, 
+          otherParticipant: otherParticipant!, 
+          lastMessage 
+        };
+      }));
+    } catch (error) {
+      console.error("Error in getConversationsByUser:", error);
+      throw error;
+    }
+  }
+
+  async createConversation(conversation: InsertConversation): Promise<Conversation> {
+    try {
+      const result = await db.insert(conversations).values({
+        ...conversation,
+        lastMessageAt: new Date(),
+        jobId: conversation.jobId ?? null, // Ensure jobId is not undefined
+      }).returning();
+      
+      return result[0];
+    } catch (error) {
+      console.error("Error in createConversation:", error);
+      throw error;
+    }
+  }
+
+  async updateConversationLastMessage(id: number, lastMessageAt: Date = new Date()): Promise<Conversation | undefined> {
+    try {
+      const result = await db.update(conversations)
+        .set({ lastMessageAt })
+        .where(eq(conversations.id, id))
+        .returning();
+      
+      if (result.length === 0) return undefined;
+      return result[0];
+    } catch (error) {
+      console.error("Error in updateConversationLastMessage:", error);
+      throw error;
+    }
+  }
+
+  // Message operations
+  async getMessage(id: number): Promise<Message | undefined> {
+    try {
+      const result = await db.select().from(messages).where(eq(messages.id, id));
+      if (result.length === 0) return undefined;
+      return result[0];
+    } catch (error) {
+      console.error("Error in getMessage:", error);
+      throw error;
+    }
+  }
+
+  async getMessagesByConversation(conversationId: number): Promise<Message[]> {
+    try {
+      return await db.select().from(messages)
+        .where(eq(messages.conversationId, conversationId))
+        .orderBy(messages.sentAt); // Sort from oldest to newest
+    } catch (error) {
+      console.error("Error in getMessagesByConversation:", error);
+      throw error;
+    }
+  }
+
+  async createMessage(message: InsertMessage): Promise<Message> {
+    try {
+      const result = await db.insert(messages).values({
+        ...message,
+        sentAt: new Date(),
+        metadata: message.metadata ?? {}, // Ensure metadata is not undefined
+      }).returning();
+      
+      // Update conversation's last message timestamp
+      await this.updateConversationLastMessage(message.conversationId);
+      
+      return result[0];
+    } catch (error) {
+      console.error("Error in createMessage:", error);
+      throw error;
+    }
+  }
+
+  async markMessagesAsRead(conversationId: number, userId: number): Promise<void> {
+    try {
+      const now = new Date();
+      
+      // Find all unread messages in this conversation sent to this user
+      await db.update(messages)
+        .set({ readAt: now })
+        .where(
+          and(
+            eq(messages.conversationId, conversationId),
+            and(
+              not(eq(messages.senderId, userId)), // Not sent by this user
+              isNull(messages.readAt) // Not already read
+            )
+          )
+        );
+    } catch (error) {
+      console.error("Error in markMessagesAsRead:", error);
       throw error;
     }
   }

@@ -111,7 +111,7 @@ export default function AuthPage() {
             <Card className="w-full shadow-lg">
               <CardHeader>
                 <CardTitle className="text-2xl font-bold text-center">
-                  {activeTab === "login" ? "Welcome Back" : "Join KaamMitra"}
+                  {activeTab === "login" ? "Welcome Back" : "Join WorkBuddy"}
                 </CardTitle>
                 <CardDescription className="text-center">
                   {activeTab === "login" 
@@ -345,7 +345,7 @@ export default function AuthPage() {
             <div className="hidden lg:block p-6">
               <h1 className="text-4xl font-bold mb-6 text-primary">
                 {activeTab === "login" 
-                  ? "Welcome Back to KaamMitra"
+                  ? "Welcome Back to WorkBuddy"
                   : userType === "worker"
                     ? "Find Great Jobs Near You"
                     : "Hire Skilled Workers in Your Area"

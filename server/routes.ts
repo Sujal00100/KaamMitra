@@ -2,13 +2,24 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
-import { insertJobSchema, insertApplicationSchema, insertRatingSchema, insertVerificationDocumentSchema } from "@shared/schema";
+import { 
+  insertJobSchema, 
+  insertApplicationSchema, 
+  insertRatingSchema, 
+  insertVerificationDocumentSchema,
+  insertConversationSchema,
+  insertMessageSchema
+} from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
 import fs from "fs";
 import path from "path";
+import { eq, like, ilike, and, or } from "drizzle-orm";
+import { db } from "./db";
+import { users } from "@shared/schema"; 
 import migrateEmailFields from "./migrate-email-fields";
 import { sendVerificationEmail, verifyEmail } from "./email-service";
+import { getChatbotResponse, getJobRecommendations, getHiringTips } from "./services/openai-service";
 
 // Configure multer storage
 const storage_config = multer.diskStorage({
@@ -39,6 +50,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Set up authentication routes
   setupAuth(app);
+  
+  // POST delete all users (be careful with this route!)
+  app.post("/api/admin/delete-all-users", async (req, res) => {
+    try {
+      await storage.deleteAllUsers();
+      res.json({ message: "All user data deleted successfully" });
+    } catch (error) {
+      console.error("Error during data deletion:", error);
+      res.status(500).json({ message: "Failed to delete user data" });
+    }
+  });
+  
+  // POST set UPI payment info (admin use)
+  app.post("/api/payment/upi", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      // In a real application, you'd want to restrict this to admins
+      // if (req.user.userType !== "admin") {
+      //   return res.status(403).json({ message: "Not authorized" });
+      // }
+      
+      const { upiId } = req.body;
+      
+      if (!upiId || typeof upiId !== "string") {
+        return res.status(400).json({ message: "Valid UPI ID is required" });
+      }
+      
+      // In a real application, you would save this to the database
+      // For now, just return success
+      res.json({ 
+        message: "UPI payment option saved successfully",
+        upiId
+      });
+    } catch (error) {
+      console.error("Error saving UPI payment info:", error);
+      res.status(500).json({ message: "Failed to save UPI payment information" });
+    }
+  });
+  
+  // POST process UPI payment
+  app.post("/api/payment/process", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const { amount, upiId, recipientId, description } = req.body;
+      
+      // Validate inputs
+      if (!amount || typeof amount !== "number" || amount <= 0) {
+        return res.status(400).json({ message: "Valid amount is required" });
+      }
+      
+      if (!upiId || typeof upiId !== "string") {
+        return res.status(400).json({ message: "Valid UPI ID is required" });
+      }
+      
+      if (!description || typeof description !== "string") {
+        return res.status(400).json({ message: "Description is required" });
+      }
+      
+      // In a real application, you would process the payment and store the transaction
+      // For now, simulate a successful payment
+      
+      // Create payment record
+      const paymentRecord = {
+        id: Date.now(),
+        userId: req.user.id,
+        amount,
+        upiId,
+        recipientId: recipientId || null,
+        description,
+        status: "completed",
+        createdAt: new Date().toISOString()
+      };
+      
+      // Return success
+      res.json({ 
+        message: "Payment processed successfully",
+        transaction: paymentRecord
+      });
+    } catch (error) {
+      console.error("Error processing payment:", error);
+      res.status(500).json({ message: "Failed to process payment" });
+    }
+  });
 
   // GET workers
   app.get("/api/workers", async (req, res) => {
@@ -587,6 +687,344 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: "Failed to resend verification email",
         error: errorMessage
       });
+    }
+  });
+
+  // Chatbot API endpoint
+  app.post("/api/chatbot/message", async (req, res) => {
+    try {
+      const { message } = req.body;
+      
+      if (!message || typeof message !== 'string') {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Message is required and must be a string" 
+        });
+      }
+      
+      const response = await getChatbotResponse(message);
+      
+      return res.json({
+        success: true,
+        response
+      });
+    } catch (error) {
+      console.error("Chatbot error:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      return res.status(500).json({
+        success: false,
+        message: "Failed to process chatbot message",
+        error: errorMessage
+      });
+    }
+  });
+  
+  // Job recommendations API endpoint
+  app.post("/api/chatbot/job-recommendations", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      if (req.user.userType !== "worker") {
+        return res.status(403).json({ message: "Only workers can get job recommendations" });
+      }
+      
+      const { primarySkill, location, preferredJobTypes } = req.body;
+      
+      if (!primarySkill || !location) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Primary skill and location are required" 
+        });
+      }
+      
+      const recommendations = await getJobRecommendations({
+        primarySkill,
+        location,
+        preferredJobTypes
+      });
+      
+      return res.json({
+        success: true,
+        recommendations
+      });
+    } catch (error) {
+      console.error("Job recommendations error:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      return res.status(500).json({
+        success: false,
+        message: "Failed to get job recommendations",
+        error: errorMessage
+      });
+    }
+  });
+  
+  // Hiring tips API endpoint
+  app.post("/api/chatbot/hiring-tips", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      if (req.user.userType !== "employer") {
+        return res.status(403).json({ message: "Only employers can get hiring tips" });
+      }
+      
+      const { jobTitle, requiredSkills, location } = req.body;
+      
+      if (!jobTitle || !requiredSkills || !location) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Job title, required skills, and location are required" 
+        });
+      }
+      
+      const tips = await getHiringTips({
+        jobTitle,
+        requiredSkills,
+        location
+      });
+      
+      return res.json({
+        success: true,
+        tips
+      });
+    } catch (error) {
+      console.error("Hiring tips error:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      return res.status(500).json({
+        success: false,
+        message: "Failed to get hiring tips",
+        error: errorMessage
+      });
+    }
+  });
+
+  // Messaging API Routes
+  
+  // GET conversations for current user
+  app.get("/api/conversations", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const conversations = await storage.getConversationsByUser(req.user.id);
+      res.json(conversations);
+    } catch (error) {
+      console.error("Error fetching conversations:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({ message: "Failed to fetch conversations", error: errorMessage });
+    }
+  });
+
+  // GET single conversation with messages
+  app.get("/api/conversations/:id", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const conversationId = parseInt(req.params.id);
+      const conversation = await storage.getConversation(conversationId);
+      
+      if (!conversation) {
+        return res.status(404).json({ message: "Conversation not found" });
+      }
+      
+      // Check if user is a participant in this conversation
+      if (conversation.participant1Id !== req.user.id && conversation.participant2Id !== req.user.id) {
+        return res.status(403).json({ message: "You don't have access to this conversation" });
+      }
+      
+      // Mark messages as read for this user
+      await storage.markMessagesAsRead(conversationId, req.user.id);
+      
+      // Get the other participant
+      const otherParticipantId = conversation.participant1Id === req.user.id 
+        ? conversation.participant2Id 
+        : conversation.participant1Id;
+      
+      const otherParticipant = await storage.getUser(otherParticipantId);
+      
+      // Get messages
+      const messages = await storage.getMessagesByConversation(conversationId);
+      
+      res.json({
+        conversation,
+        otherParticipant,
+        messages
+      });
+    } catch (error) {
+      console.error("Error fetching conversation:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({ message: "Failed to fetch conversation", error: errorMessage });
+    }
+  });
+
+  // POST start new conversation or get existing
+  app.post("/api/conversations", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const { participantId, jobId } = req.body;
+      
+      if (!participantId) {
+        return res.status(400).json({ message: "Participant ID is required" });
+      }
+      
+      const participant = await storage.getUser(participantId);
+      
+      if (!participant) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Check if conversation already exists
+      let conversation = await storage.getConversationByParticipants(req.user.id, participantId);
+      
+      if (!conversation) {
+        // Create new conversation
+        conversation = await storage.createConversation({
+          participant1Id: req.user.id,
+          participant2Id: participantId,
+          jobId: jobId || null
+        });
+      }
+      
+      res.status(201).json(conversation);
+    } catch (error) {
+      console.error("Error creating conversation:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({ message: "Failed to create conversation", error: errorMessage });
+    }
+  });
+
+  // POST send message
+  app.post("/api/conversations/:id/messages", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const conversationId = parseInt(req.params.id);
+      const conversation = await storage.getConversation(conversationId);
+      
+      if (!conversation) {
+        return res.status(404).json({ message: "Conversation not found" });
+      }
+      
+      // Check if user is a participant in this conversation
+      if (conversation.participant1Id !== req.user.id && conversation.participant2Id !== req.user.id) {
+        return res.status(403).json({ message: "You don't have access to this conversation" });
+      }
+      
+      const { content } = req.body;
+      
+      if (!content || typeof content !== "string" || content.trim() === "") {
+        return res.status(400).json({ message: "Message content is required" });
+      }
+      
+      const message = await storage.createMessage({
+        conversationId,
+        senderId: req.user.id,
+        content,
+        metadata: {}
+      });
+      
+      res.status(201).json(message);
+    } catch (error) {
+      console.error("Error sending message:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({ message: "Failed to send message", error: errorMessage });
+    }
+  });
+
+  // PATCH mark messages as read
+  app.patch("/api/conversations/:id/read", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const conversationId = parseInt(req.params.id);
+      const conversation = await storage.getConversation(conversationId);
+      
+      if (!conversation) {
+        return res.status(404).json({ message: "Conversation not found" });
+      }
+      
+      // Check if user is a participant in this conversation
+      if (conversation.participant1Id !== req.user.id && conversation.participant2Id !== req.user.id) {
+        return res.status(403).json({ message: "You don't have access to this conversation" });
+      }
+      
+      await storage.markMessagesAsRead(conversationId, req.user.id);
+      res.status(200).json({ message: "Messages marked as read" });
+    } catch (error) {
+      console.error("Error marking messages as read:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({ message: "Failed to mark messages as read", error: errorMessage });
+    }
+  });
+  
+  // Search users endpoint (used for messaging)
+  app.get("/api/search/users", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const query = req.query.query as string;
+      const userType = req.query.userType as string;
+      
+      if (!query) {
+        return res.status(400).json({ message: "Search query is required" });
+      }
+      
+      // Perform search in the database using Drizzle ORM
+      let conditions = [];
+      
+      // First condition: username or fullName contains the query string
+      conditions.push(
+        or(
+          ilike(users.username, `%${query}%`),
+          ilike(users.fullName, `%${query}%`)
+        )
+      );
+      
+      // Second condition: exclude the current user
+      conditions.push(
+        (users.id != req.user.id)
+      );
+      
+      // Optional third condition: filter by user type if provided
+      if (userType === 'worker' || userType === 'employer') {
+        conditions.push(
+          eq(users.userType, userType)
+        );
+      }
+      
+      // Execute the query
+      const foundUsers = await db
+        .select({
+          id: users.id,
+          username: users.username,
+          fullName: users.fullName,
+          location: users.location,
+          userType: users.userType,
+        })
+        .from(users)
+        .where(and(...conditions))
+        .limit(10);
+      
+      res.json(foundUsers);
+    } catch (error) {
+      console.error("User search error:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({ message: "Failed to search users", error: errorMessage });
     }
   });
 
